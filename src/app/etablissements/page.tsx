@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { logout } from "../login/actions";
 import { NewEstablishmentForm } from "./new-establishment-form";
 import { DeleteButton } from "./delete-button";
@@ -18,9 +18,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 export default async function EtablissementsPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) {
     redirect("/login");
   }

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   allocateOverhead,
@@ -64,7 +65,7 @@ const workshopKey = (id: string) => `workshop:${id}`;
 
 // Ateliers de l'établissement + prévisionnel (séances, participants) des 12 mois.
 // Table absente (migration non appliquée) ou aucun atelier : liste vide.
-async function fetchWorkshops(
+const fetchWorkshops = cache(async function fetchWorkshops(
   supabase: SupabaseClient,
   establishmentId: string
 ): Promise<{ workshops: WorkshopRow[]; forecasts: WorkshopForecasts }> {
@@ -93,7 +94,7 @@ async function fetchWorkshops(
     f.participants[row.month - 1] = row.participants;
   }
   return { workshops, forecasts };
-}
+});
 
 // Coût du kit d'UN participant et besoins en fournitures, pour chaque atelier.
 async function fetchWorkshopKits(
@@ -148,10 +149,21 @@ function workshopOverheadInputs(
 
 // Point d'entrée central : calcule les frais généraux du mois puis leur répartition
 // entre les recettes, en une seule fois (évite de refaire la même requête plusieurs fois).
-export async function getMonthCostContext(
+// Mis en cache pour la durée d'une requête : une même page (ex. le Rapport) le demande
+// plusieurs fois pour le même mois via plusieurs fonctions ; la base n'est lue qu'une fois.
+// Clé du cache = (client Supabase, établissement, mois) : chaque page crée un seul client.
+export function getMonthCostContext(
   supabase: SupabaseClient,
   establishmentId: string,
   month: number = currentMonth()
+): Promise<MonthCostContext> {
+  return computeMonthCostContext(supabase, establishmentId, month);
+}
+
+const computeMonthCostContext = cache(async function computeMonthCostContext(
+  supabase: SupabaseClient,
+  establishmentId: string,
+  month: number
 ): Promise<MonthCostContext> {
   const [
     { data: settings },
@@ -243,7 +255,7 @@ export async function getMonthCostContext(
       };
     }),
   };
-}
+});
 
 export async function getMonthlyCostsSummary(
   supabase: SupabaseClient,
@@ -254,10 +266,18 @@ export async function getMonthlyCostsSummary(
   return context.summary;
 }
 
-export async function getRecipesWithCost(
+export function getRecipesWithCost(
   supabase: SupabaseClient,
   establishmentId: string,
   month: number = currentMonth()
+): Promise<{ recipe: RecipeForCosting; breakdown: CostBreakdown }[]> {
+  return computeRecipesWithCost(supabase, establishmentId, month);
+}
+
+const computeRecipesWithCost = cache(async function computeRecipesWithCost(
+  supabase: SupabaseClient,
+  establishmentId: string,
+  month: number
 ): Promise<{ recipe: RecipeForCosting; breakdown: CostBreakdown }[]> {
   const context = await getMonthCostContext(supabase, establishmentId, month);
   if (!context.recipes.length) return [];
@@ -292,7 +312,7 @@ export async function getRecipesWithCost(
     });
     return { recipe, breakdown };
   });
-}
+});
 
 export type WorkshopWithCost = WorkshopForMonth & {
   kitCost: number; // kit d'un participant
@@ -362,7 +382,8 @@ export type PlanningData = {
 
 // Toutes les données nécessaires au planning annuel, calculables entièrement côté
 // client ensuite (aucun aller-retour serveur nécessaire pour changer de mois).
-export async function getPlanningData(
+// Mis en cache par requête : le Rapport l'utilise via getStockNeeds, l'Export directement.
+export const getPlanningData = cache(async function getPlanningData(
   supabase: SupabaseClient,
   establishmentId: string
 ): Promise<PlanningData> {
@@ -510,7 +531,7 @@ export async function getPlanningData(
     actualsYear,
     actuals,
   };
-}
+});
 
 export type StockNeed = { nom: string; usageUnit: string; quantity: number; cost: number };
 

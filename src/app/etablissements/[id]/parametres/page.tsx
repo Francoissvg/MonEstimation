@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { getMonthlyCostsSummary } from "@/lib/recipe-costs.server";
 import { FraisManager } from "./frais-manager";
 import { getEstablishmentVocabulary } from "@/lib/establishment.server";
@@ -12,9 +12,7 @@ export default async function ParametresPage({
   const { id } = await params;
   const vocab = await getEstablishmentVocabulary(id);
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) {
     redirect("/login");
   }

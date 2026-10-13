@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { hasStarterTemplate } from "@/lib/starter-templates";
 import { getRecipesWithCost } from "@/lib/recipe-costs.server";
 import { RecipeForm } from "./recipe-form";
@@ -15,9 +15,7 @@ export default async function RecipesPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) {
     redirect("/login");
   }

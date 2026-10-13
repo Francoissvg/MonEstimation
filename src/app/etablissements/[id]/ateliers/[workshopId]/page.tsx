@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { getEstablishmentVocabulary } from "@/lib/establishment.server";
 import { matterCost } from "@/lib/costing";
 import { currentMonth, getMonthCostContext } from "@/lib/recipe-costs.server";
@@ -34,9 +34,7 @@ export default async function WorkshopDetailPage({
   }
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) {
     redirect("/login");
   }

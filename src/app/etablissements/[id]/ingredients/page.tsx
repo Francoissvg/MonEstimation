@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { IngredientsManager } from "./ingredients-manager";
 import { getEstablishmentVocabulary } from "@/lib/establishment.server";
 import type { PurchaseRow } from "./purchase-history";
@@ -11,9 +11,7 @@ export default async function IngredientsPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) {
     redirect("/login");
   }

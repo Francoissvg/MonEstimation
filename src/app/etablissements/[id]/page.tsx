@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { getMonthlyCostsSummary, getRecipesWithCost, getWorkshopsWithCost } from "@/lib/recipe-costs.server";
 import { StatTile } from "@/components/stat-tile";
 import { GroupedBarChart } from "@/components/charts/grouped-bar-chart";
@@ -29,9 +29,7 @@ export default async function DashboardPage({
   const { id } = await params;
   const vocab = await getEstablishmentVocabulary(id);
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) {
     redirect("/login");
   }

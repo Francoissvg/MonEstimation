@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { pricePerUsageUnit, baseUnitFor } from "@/lib/units";
 import {
   currentMonth,
@@ -47,9 +47,7 @@ export default async function ExportPage({
   const { id } = await params;
   const vocab = await getEstablishmentVocabulary(id);
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) {
     redirect("/login");
   }

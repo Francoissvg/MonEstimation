@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/server";
 import { getEstablishment } from "@/lib/establishment.server";
 import { getVocabulary } from "@/lib/vocabulary";
 import { Sidebar } from "./sidebar";
@@ -14,10 +14,7 @@ export default async function EstablishmentLayout({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) {
     redirect("/login");
   }

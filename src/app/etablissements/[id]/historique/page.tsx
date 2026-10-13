@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { HistoriqueTable } from "./historique-table";
 import { SupplierPriceReport, type SupplierPriceRow } from "./supplier-price-report";
 import { PurchaseVsSaleChart, type RecipeHistorySeries } from "./purchase-vs-sale-chart";
@@ -15,9 +15,7 @@ export default async function HistoriquePage({
   const { id } = await params;
   const vocab = await getEstablishmentVocabulary(id);
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
   if (!user) {
     redirect("/login");
   }
