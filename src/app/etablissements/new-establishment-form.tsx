@@ -3,15 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { createEstablishment, type FormState } from "./actions";
 import { cardClass, inputClass, labelClass, primaryButtonClass } from "@/lib/ui";
-
-const TYPES = ["Boulangerie", "Restaurant", "Bar", "Autre"] as const;
-
-const STARTER_HINTS: Record<string, string> = {
-  Boulangerie: "baguette, croissant, pain au chocolat...",
-  Restaurant: "steak frites, burger, salade composée...",
-  Bar: "mojito, vodka orange, bière pression...",
-  Autre: "sandwich jambon-beurre, sandwich crudités-fromage...",
-};
+import { ESTABLISHMENT_TYPES, getVocabulary } from "@/lib/vocabulary";
 
 const initialState: FormState = { error: null };
 
@@ -29,7 +21,7 @@ export function NewEstablishmentForm() {
     wasPending.current = pending;
   }, [pending, state.error]);
 
-  const starterHint = STARTER_HINTS[type];
+  const starterHint = getVocabulary(type).starterHint;
 
   return (
     <form
@@ -62,7 +54,7 @@ export function NewEstablishmentForm() {
             onChange={(event) => setType(event.target.value)}
             className={inputClass}
           >
-            {TYPES.map((t) => (
+            {ESTABLISHMENT_TYPES.map((t) => (
               <option key={t} value={t}>
                 {t}
               </option>

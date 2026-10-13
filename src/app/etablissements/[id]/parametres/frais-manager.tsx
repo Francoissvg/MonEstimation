@@ -8,6 +8,8 @@ import { StatTile } from "@/components/stat-tile";
 import type { MonthlyCostsSummary } from "@/lib/costing";
 import { money, number } from "@/lib/format";
 import { currentMonth, MONTH_LABELS } from "@/lib/months";
+import { useVocabulary } from "@/components/vocabulary-provider";
+import { capitalize } from "@/lib/vocabulary";
 
 const TABS = [
   { key: "employees", label: "Salariés" },
@@ -31,6 +33,7 @@ export function FraisManager({
   utilities: UtilityRow[];
   summary: MonthlyCostsSummary;
 }) {
+  const vocab = useVocabulary();
   const [tab, setTab] = useState<TabKey>("employees");
 
   return (
@@ -75,18 +78,19 @@ export function FraisManager({
               value={money(summary.fixed + summary.utilities)}
               icon="⚡"
             />
-            <StatTile label="Frais moyens / part" value={money(summary.unitOverhead)} tone="accent" icon="📊" />
+            <StatTile label={`Frais moyens / ${vocab.part}`} value={money(summary.unitOverhead)} tone="accent" icon="📊" />
           </div>
           <p className="text-sm text-brand-muted">
-            Parts prévues sur le mois (toutes recettes) : <strong>{number(summary.monthlyUnits)}</strong>{" "}
-            (somme du prévisionnel de vos recettes — 0 si aucune n&apos;en a).
+            {capitalize(vocab.parts)} prévues sur le mois (toutes {vocab.recipesLower}) :{" "}
+            <strong>{number(summary.monthlyUnits)}</strong> (somme du prévisionnel de vos{" "}
+            {vocab.recipesLower} — 0 si aucune n&apos;en a).
           </p>
           <p className="text-sm text-brand-muted">
-            La quote-part réellement appliquée à chaque recette n&apos;est pas cette moyenne : elle
-            est proportionnelle à son chiffre d&apos;affaires prévisionnel (prix de vente ×
-            prévisionnel), pour qu&apos;une recette plus chère ou plus vendue absorbe davantage de
-            frais qu&apos;une recette bon marché. Sans aucun prévisionnel renseigné nulle part, aucun
-            frais n&apos;est attribué aux recettes.
+            La quote-part réellement appliquée à chaque {vocab.recipeLower} n&apos;est pas cette
+            moyenne : elle est proportionnelle à son chiffre d&apos;affaires prévisionnel (prix de
+            vente × prévisionnel), pour qu&apos;une {vocab.recipeLower} plus chère ou plus vendue
+            absorbe davantage de frais qu&apos;une {vocab.recipeLower} bon marché. Sans aucun
+            prévisionnel renseigné nulle part, aucun frais n&apos;est attribué aux {vocab.recipesLower}.
           </p>
         </div>
       ) : null}

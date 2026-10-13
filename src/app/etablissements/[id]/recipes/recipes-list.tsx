@@ -8,6 +8,7 @@ import { tableWrapClass, tableHeadClass, tableRowClass } from "@/lib/ui";
 import { compareValues, toggleSort, type SortState } from "@/lib/sort";
 import { SortHeader } from "@/components/sort-header";
 import { SearchInput } from "@/components/search-input";
+import { useVocabulary } from "@/components/vocabulary-provider";
 
 export type RecipeListRow = {
   id: string;
@@ -29,6 +30,7 @@ export function RecipesList({
   establishmentId: string;
   recipes: RecipeListRow[];
 }) {
+  const vocab = useVocabulary();
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortState<SortKey>>({ key: "nom", direction: "asc" });
 
@@ -56,7 +58,7 @@ export function RecipesList({
   return (
     <div className="space-y-4">
       <div className="max-w-xs">
-        <SearchInput value={search} onChange={setSearch} placeholder="Rechercher une recette..." />
+        <SearchInput value={search} onChange={setSearch} placeholder={`Rechercher une ${vocab.recipeLower}...`} />
       </div>
 
       <div className={tableWrapClass}>
@@ -64,10 +66,12 @@ export function RecipesList({
           <thead className={tableHeadClass}>
             <tr>
               <th className="px-4 py-3">{header("nom", "Nom")}</th>
-              <th className="px-4 py-3">{header("portions", "Parts")}</th>
-              <th className="px-4 py-3">{header("prix_vente", "Prix / part")}</th>
-              <th className="px-4 py-3">{header("total", "CA total / fournée")}</th>
-              <th className="px-4 py-3">{header("margin", "Marge / part")}</th>
+              {vocab.showPortions ? <th className="px-4 py-3">{header("portions", "Parts")}</th> : null}
+              <th className="px-4 py-3">{header("prix_vente", `Prix / ${vocab.part}`)}</th>
+              {vocab.showPortions ? (
+                <th className="px-4 py-3">{header("total", `CA total / ${vocab.batch}`)}</th>
+              ) : null}
+              <th className="px-4 py-3">{header("margin", `Marge / ${vocab.part}`)}</th>
               <th className="px-4 py-3">{header("marginRate", "Taux")}</th>
               <th className="px-4 py-3" />
             </tr>
@@ -90,11 +94,15 @@ export function RecipesList({
                       Voir le détail →
                     </Link>
                   </td>
-                  <td className="px-4 py-3 text-brand-muted">{number(recipe.portions)}</td>
+                  {vocab.showPortions ? (
+                    <td className="px-4 py-3 text-brand-muted">{number(recipe.portions)}</td>
+                  ) : null}
                   <td className="px-4 py-3 text-brand-muted">{money(recipe.prix_vente)}</td>
-                  <td className="px-4 py-3 text-brand-muted">
-                    {money(recipe.prix_vente * recipe.portions)}
-                  </td>
+                  {vocab.showPortions ? (
+                    <td className="px-4 py-3 text-brand-muted">
+                      {money(recipe.prix_vente * recipe.portions)}
+                    </td>
+                  ) : null}
                   <td className="px-4 py-3 text-brand-muted">{money(recipe.margin)}</td>
                   <td
                     className={`px-4 py-3 font-medium ${
@@ -112,8 +120,8 @@ export function RecipesList({
               ))
             ) : (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-brand-muted">
-                  {recipes.length ? "Aucun résultat." : "Aucune recette pour l'instant."}
+                <td colSpan={vocab.showPortions ? 7 : 5} className="px-4 py-8 text-center text-brand-muted">
+                  {recipes.length ? "Aucun résultat." : `Aucune ${vocab.recipeLower} pour l'instant.`}
                 </td>
               </tr>
             )}

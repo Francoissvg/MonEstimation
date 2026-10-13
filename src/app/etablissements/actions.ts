@@ -4,8 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { seedStarterData } from "@/lib/seed-starter-data.server";
-
-export type EstablishmentType = "Boulangerie" | "Restaurant" | "Bar" | "Autre";
+import { isEstablishmentType } from "@/lib/vocabulary";
 
 export type FormState = { error: string | null };
 
@@ -20,7 +19,7 @@ export async function createEstablishment(
   if (!nom) {
     return { error: "Le nom est obligatoire." };
   }
-  if (!["Boulangerie", "Restaurant", "Bar", "Autre"].includes(type)) {
+  if (!isEstablishmentType(type)) {
     return { error: "Type d'établissement invalide." };
   }
 

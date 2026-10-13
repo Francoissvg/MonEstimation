@@ -1,17 +1,18 @@
 "use client";
 
-import { Fragment, useMemo, useState, useTransition } from "react";
+import { Fragment, useMemo, useRef, useState, useTransition } from "react";
 import { IngredientForm, type IngredientRow } from "./ingredient-form";
 import { deleteIngredient } from "./actions";
 import { PurchaseHistory, type PurchaseRow } from "./purchase-history";
 import { SuppliersManager, type SupplierRow } from "./suppliers-manager";
 import { pricePerUsageUnit, baseUnitFor, toDisplayUnitPrice } from "@/lib/units";
 import { money, number } from "@/lib/format";
-import { tableWrapClass, tableHeadClass, tableRowClass } from "@/lib/ui";
+import { cardClass, tableWrapClass, tableHeadClass, tableRowClass } from "@/lib/ui";
 import { compareValues, toggleSort, type SortState } from "@/lib/sort";
 import { SortHeader } from "@/components/sort-header";
 import { SearchInput } from "@/components/search-input";
 import { RowActionsMenu } from "@/components/row-actions-menu";
+import { useVocabulary } from "@/components/vocabulary-provider";
 
 type SortKey = "nom" | "categorie" | "purchase_price" | "unitPrice";
 
@@ -28,12 +29,38 @@ export function IngredientsManager({
   suppliers: SupplierRow[];
   purchaseCountBySupplier: Record<string, number>;
 }) {
+  const vocab = useVocabulary();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortState<SortKey>>({ key: "nom", direction: "asc" });
   const editing = ingredients.find((i) => i.id === editingId) ?? null;
+  const formWrapRef = useRef<HTMLDivElement>(null);
+
+  // Le formulaire est en haut de page : sur téléphone, on y remonte pour la modification.
+  const startEditing = (id: string) => {
+    setEditingId(id);
+    formWrapRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const actionsFor = (ingredient: IngredientRow, expanded: boolean, purchaseCount: number) => [
+    {
+      label: `Historique${purchaseCount ? ` (${purchaseCount})` : ""}`,
+      onClick: () => setExpandedId(expanded ? null : ingredient.id),
+    },
+    { label: "Modifier", onClick: () => startEditing(ingredient.id) },
+    {
+      label: "Supprimer",
+      tone: "danger" as const,
+      disabled: pending,
+      onClick: () => {
+        if (confirm(`Supprimer "${ingredient.nom}" ?`)) {
+          startTransition(() => deleteIngredient(ingredient.id, establishmentId));
+        }
+      },
+    },
+  ];
 
   const rows = useMemo(() => {
     const withUnitPrice = ingredients.map((ingredient) => ({
@@ -78,17 +105,71 @@ export function IngredientsManager({
 
   return (
     <div className="space-y-6">
-      <IngredientForm
-        establishmentId={establishmentId}
-        editing={editing}
-        onDone={() => setEditingId(null)}
-      />
-
-      <div className="max-w-xs">
-        <SearchInput value={search} onChange={setSearch} placeholder="Rechercher un ingrédient..." />
+      <div ref={formWrapRef} className="scroll-mt-20">
+        <IngredientForm
+          establishmentId={establishmentId}
+          editing={editing}
+          onDone={() => setEditingId(null)}
+        />
       </div>
 
-      <div className={tableWrapClass}>
+      <div className="sm:max-w-xs">
+        <SearchInput value={search} onChange={setSearch} placeholder={`Rechercher ${vocab.anIngredient}...`} />
+      </div>
+
+      {/* Téléphone : une fiche par élément, l'historique d'achat s'ouvre en pleine largeur. */}
+      <ul className="space-y-3 md:hidden">
+        {rows.length ? (
+          rows.map(({ ingredient, unitPrice }) => {
+            const expanded = expandedId === ingredient.id;
+            const purchaseCount = purchasesByIngredient[ingredient.id]?.length ?? 0;
+            const display = toDisplayUnitPrice(unitPrice, baseUnitFor(ingredient.purchase_unit));
+            return (
+              <li key={ingredient.id} className={`overflow-hidden ${cardClass}`}>
+                <div className="flex items-start gap-3 p-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-brand-ink">{ingredient.nom}</p>
+                    <p className="text-xs text-brand-muted">{ingredient.categorie}</p>
+                    <p className="mt-2 text-sm text-brand-muted">
+                      {number(ingredient.purchase_quantity)} {ingredient.purchase_unit} ·{" "}
+                      {money(ingredient.purchase_price)}
+                    </p>
+                    <p className="text-sm font-medium text-brand-ink">
+                      {money(display.price)} / {display.unit}
+                    </p>
+                  </div>
+                  <RowActionsMenu actions={actionsFor(ingredient, expanded, purchaseCount)} />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpandedId(expanded ? null : ingredient.id)}
+                  className="w-full border-t border-brand-line/70 px-4 py-3 text-left text-sm font-medium text-brand-accent-dark transition-colors hover:bg-brand-panel-soft"
+                  aria-expanded={expanded}
+                >
+                  {expanded
+                    ? "Fermer"
+                    : `+ Ajouter un achat${purchaseCount ? ` · historique (${purchaseCount})` : ""}`}
+                </button>
+                {expanded ? (
+                  <PurchaseHistory
+                    establishmentId={establishmentId}
+                    ingredientId={ingredient.id}
+                    purchases={purchasesByIngredient[ingredient.id] ?? []}
+                    suppliers={suppliers}
+                    defaultUnit={ingredient.purchase_unit}
+                  />
+                ) : null}
+              </li>
+            );
+          })
+        ) : (
+          <li className="rounded-xl border border-dashed border-brand-line p-8 text-center text-sm text-brand-muted">
+            {ingredients.length ? "Aucun résultat." : `${vocab.noIngredient} pour l'instant.`}
+          </li>
+        )}
+      </ul>
+
+      <div className={`hidden md:block ${tableWrapClass}`}>
         <table className="w-full min-w-[640px] text-left text-sm">
           <thead className={tableHeadClass}>
             <tr>
@@ -119,25 +200,7 @@ export function IngredientsManager({
                         {money(display.price)} / {display.unit}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <RowActionsMenu
-                          actions={[
-                            {
-                              label: `Historique${purchaseCount ? ` (${purchaseCount})` : ""}`,
-                              onClick: () => setExpandedId(expanded ? null : ingredient.id),
-                            },
-                            { label: "Modifier", onClick: () => setEditingId(ingredient.id) },
-                            {
-                              label: "Supprimer",
-                              tone: "danger",
-                              disabled: pending,
-                              onClick: () => {
-                                if (confirm(`Supprimer "${ingredient.nom}" ?`)) {
-                                  startTransition(() => deleteIngredient(ingredient.id, establishmentId));
-                                }
-                              },
-                            },
-                          ]}
-                        />
+                        <RowActionsMenu actions={actionsFor(ingredient, expanded, purchaseCount)} />
                       </td>
                     </tr>
                     {expanded ? (
@@ -148,6 +211,7 @@ export function IngredientsManager({
                             ingredientId={ingredient.id}
                             purchases={purchasesByIngredient[ingredient.id] ?? []}
                             suppliers={suppliers}
+                            defaultUnit={ingredient.purchase_unit}
                           />
                         </td>
                       </tr>
@@ -158,7 +222,7 @@ export function IngredientsManager({
             ) : (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-brand-muted">
-                  {ingredients.length ? "Aucun résultat." : "Aucun ingrédient pour l'instant."}
+                  {ingredients.length ? "Aucun résultat." : `${vocab.noIngredient} pour l'instant.`}
                 </td>
               </tr>
             )}

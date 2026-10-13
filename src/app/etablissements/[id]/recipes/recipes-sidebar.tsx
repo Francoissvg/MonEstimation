@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 import { money } from "@/lib/format";
 import { SearchInput } from "@/components/search-input";
+import { useVocabulary } from "@/components/vocabulary-provider";
 
 export type RecipeSummary = {
   id: string;
@@ -19,6 +20,7 @@ export function RecipesSidebar({
   establishmentId: string;
   recipes: RecipeSummary[];
 }) {
+  const vocab = useVocabulary();
   const pathname = usePathname();
   const [search, setSearch] = useState("");
   const listHref = `/etablissements/${establishmentId}/recipes`;
@@ -30,7 +32,7 @@ export function RecipesSidebar({
   }, [recipes, search]);
 
   return (
-    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-brand-line/70 bg-brand-panel">
+    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-brand-line/70 bg-brand-panel lg:flex">
       <div className="space-y-2 border-b border-brand-line/70 p-3">
         <Link
           href={listHref}
@@ -40,7 +42,7 @@ export function RecipesSidebar({
               : "text-brand-ink hover:bg-brand-panel-soft"
           }`}
         >
-          + Nouvelle recette / liste
+          + Nouvelle {vocab.recipeLower} / liste
         </Link>
         <SearchInput value={search} onChange={setSearch} placeholder="Rechercher..." />
       </div>
@@ -66,7 +68,7 @@ export function RecipesSidebar({
             );
           })
         ) : (
-          <p className="px-3 py-2 text-sm text-brand-muted">Aucune recette.</p>
+          <p className="px-3 py-2 text-sm text-brand-muted">Aucune {vocab.recipeLower}.</p>
         )}
       </nav>
     </aside>

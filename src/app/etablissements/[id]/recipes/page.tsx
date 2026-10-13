@@ -6,6 +6,7 @@ import { RecipeForm } from "./recipe-form";
 import { RecipesList } from "./recipes-list";
 import { AddStarterExamplesButton } from "./add-starter-examples-button";
 import { TargetMarginForm } from "./target-margin-form";
+import { getEstablishmentVocabulary } from "@/lib/establishment.server";
 
 export default async function RecipesPage({
   params,
@@ -30,6 +31,7 @@ export default async function RecipesPage({
   if (!establishment) {
     notFound();
   }
+  const vocab = await getEstablishmentVocabulary(id);
 
   const [recipesWithCost, { data: settings }] = await Promise.all([
     getRecipesWithCost(supabase, id),
@@ -47,10 +49,11 @@ export default async function RecipesPage({
     .sort((a, b) => a.nom.localeCompare(b.nom));
 
   return (
-    <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
-      <h1 className="text-2xl font-semibold tracking-tight text-brand-ink">Recettes</h1>
+    <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6 sm:px-6 sm:py-10">
+      <h1 className="text-2xl font-semibold tracking-tight text-brand-ink">{vocab.recipes}</h1>
       <p className="mt-1 text-sm text-brand-muted">
-        Créez une recette puis ouvrez-la pour ajouter ses ingrédients et voir le coût de revient.
+        Créez une {vocab.recipeLower} puis ouvrez-la pour ajouter ses {vocab.ingredientsLower} et voir
+        le coût de revient.
       </p>
 
       <div className="mt-6">
@@ -64,7 +67,7 @@ export default async function RecipesPage({
       {!recipes.length && hasStarterTemplate(establishment.type) ? (
         <div className="mt-8 rounded-xl border border-dashed border-brand-line p-8 text-center">
           <p className="text-sm text-brand-muted">
-            Envie de démarrer plus vite ? Ajoutez quelques recettes types pour un établissement de
+            Envie de démarrer plus vite ? Ajoutez quelques {vocab.recipesLower} types pour un établissement de
             type {establishment.type}.
           </p>
           <div className="mt-4">

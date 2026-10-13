@@ -6,16 +6,17 @@ export const cardClass =
 export const cardHoverClass =
   "transition-all duration-150 hover:-translate-y-0.5 hover:border-brand-accent/40 hover:shadow-[0_1px_2px_rgba(23,32,42,0.04),0_16px_32px_-16px_rgba(37,109,133,0.25)]";
 
+// text-base (16 px) sur téléphone : en dessous, iOS zoome automatiquement sur le champ.
 export const inputClass =
-  "mt-1 w-full rounded-lg border border-brand-line bg-white px-3 py-2 text-sm text-brand-ink transition-shadow placeholder:text-brand-muted/60 focus:border-brand-accent focus:outline-none focus:ring-2 focus:ring-brand-accent/20";
+  "mt-1 w-full rounded-lg border border-brand-line bg-white px-3 py-2.5 text-base text-brand-ink sm:py-2 sm:text-sm transition-shadow placeholder:text-brand-muted/60 focus:border-brand-accent focus:outline-none focus:ring-2 focus:ring-brand-accent/20";
 
 export const labelClass = "block text-sm font-medium text-brand-ink";
 
 export const primaryButtonClass =
-  "inline-flex items-center justify-center rounded-lg bg-gradient-to-b from-brand-accent to-brand-accent-dark px-4 py-2 text-sm font-medium text-white shadow-sm transition-all hover:shadow-md hover:brightness-110 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100";
+  "inline-flex items-center justify-center rounded-lg bg-gradient-to-b from-brand-accent to-brand-accent-dark px-4 py-2.5 text-sm sm:py-2 font-medium text-white shadow-sm transition-all hover:shadow-md hover:brightness-110 active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100";
 
 export const secondaryButtonClass =
-  "inline-flex items-center justify-center rounded-lg border border-brand-line bg-white px-4 py-2 text-sm font-medium text-brand-ink transition-all hover:border-brand-accent/40 hover:bg-brand-panel-soft active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100";
+  "inline-flex items-center justify-center rounded-lg border border-brand-line bg-white px-4 py-2.5 text-sm font-medium text-brand-ink transition-all sm:py-2 hover:border-brand-accent/40 hover:bg-brand-panel-soft active:scale-[0.98] disabled:opacity-50 disabled:active:scale-100";
 
 export const dangerLinkClass = "text-sm text-brand-danger hover:underline disabled:opacity-50";
 

@@ -158,6 +158,71 @@ export const STARTER_TEMPLATES: Record<string, StarterTemplate> = {
     ],
   },
 
+  Fleuriste: {
+    ingredients: [
+      { nom: "Rose rouge 50 cm (tige)", categorie: "Fleurs coupées", purchase_quantity: 20, purchase_unit: "piece", purchase_price: 14 },
+      { nom: "Tulipe (tige)", categorie: "Fleurs coupées", purchase_quantity: 10, purchase_unit: "piece", purchase_price: 5 },
+      { nom: "Gypsophile (tige)", categorie: "Fleurs coupées", purchase_quantity: 10, purchase_unit: "piece", purchase_price: 8 },
+      { nom: "Eucalyptus (tige)", categorie: "Feuillages", purchase_quantity: 10, purchase_unit: "piece", purchase_price: 6 },
+      { nom: "Pittosporum (tige)", categorie: "Feuillages", purchase_quantity: 10, purchase_unit: "piece", purchase_price: 5 },
+      { nom: "Coupe céramique", categorie: "Contenants", purchase_quantity: 6, purchase_unit: "piece", purchase_price: 21 },
+      { nom: "Mousse florale (brique)", categorie: "Accessoires", purchase_quantity: 20, purchase_unit: "piece", purchase_price: 18 },
+      { nom: "Papier kraft (feuille)", categorie: "Emballage", purchase_quantity: 100, purchase_unit: "piece", purchase_price: 12 },
+      { nom: "Ruban satin (mètre)", categorie: "Emballage", purchase_quantity: 25, purchase_unit: "piece", purchase_price: 6 },
+    ],
+    recipes: [
+      {
+        nom: "Bouquet rond de saison",
+        portions: 1,
+        prix_vente: 35,
+        items: [
+          { ingredient: "Rose rouge 50 cm (tige)", quantite: 3, unite: "piece" },
+          { ingredient: "Tulipe (tige)", quantite: 5, unite: "piece" },
+          { ingredient: "Gypsophile (tige)", quantite: 3, unite: "piece" },
+          { ingredient: "Pittosporum (tige)", quantite: 4, unite: "piece" },
+          { ingredient: "Eucalyptus (tige)", quantite: 3, unite: "piece" },
+          { ingredient: "Papier kraft (feuille)", quantite: 2, unite: "piece" },
+          { ingredient: "Ruban satin (mètre)", quantite: 1, unite: "piece" },
+        ],
+      },
+      {
+        nom: "Bouquet de 12 roses",
+        portions: 1,
+        prix_vente: 39,
+        items: [
+          { ingredient: "Rose rouge 50 cm (tige)", quantite: 12, unite: "piece" },
+          { ingredient: "Eucalyptus (tige)", quantite: 4, unite: "piece" },
+          { ingredient: "Papier kraft (feuille)", quantite: 2, unite: "piece" },
+          { ingredient: "Ruban satin (mètre)", quantite: 1, unite: "piece" },
+        ],
+      },
+      {
+        nom: "Composition en coupe",
+        portions: 1,
+        prix_vente: 45,
+        items: [
+          { ingredient: "Coupe céramique", quantite: 1, unite: "piece" },
+          { ingredient: "Mousse florale (brique)", quantite: 1, unite: "piece" },
+          { ingredient: "Rose rouge 50 cm (tige)", quantite: 5, unite: "piece" },
+          { ingredient: "Gypsophile (tige)", quantite: 3, unite: "piece" },
+          { ingredient: "Pittosporum (tige)", quantite: 5, unite: "piece" },
+        ],
+      },
+      {
+        nom: "Centre de table",
+        portions: 1,
+        prix_vente: 38,
+        items: [
+          { ingredient: "Coupe céramique", quantite: 1, unite: "piece" },
+          { ingredient: "Mousse florale (brique)", quantite: 1, unite: "piece" },
+          { ingredient: "Tulipe (tige)", quantite: 6, unite: "piece" },
+          { ingredient: "Eucalyptus (tige)", quantite: 4, unite: "piece" },
+          { ingredient: "Gypsophile (tige)", quantite: 2, unite: "piece" },
+        ],
+      },
+    ],
+  },
+
   Autre: {
     ingredients: [
       { nom: "Pain sandwich", categorie: "Farines et céréales", purchase_quantity: 10, purchase_unit: "piece", purchase_price: 5 },

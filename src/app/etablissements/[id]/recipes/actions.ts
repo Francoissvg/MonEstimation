@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { seedStarterData } from "@/lib/seed-starter-data.server";
+import { getEstablishmentVocabulary } from "@/lib/establishment.server";
 
 export type FormState = { error: string | null };
 
@@ -43,8 +44,9 @@ export async function saveRecipe(_prevState: FormState, formData: FormData): Pro
   const { error, data } = await query;
 
   if (error) {
-    if (error.code === "23505") return { error: "Une recette avec ce nom existe déjà." };
-    return { error: "Impossible d'enregistrer la recette." };
+    const vocab = await getEstablishmentVocabulary(establishmentId);
+    if (error.code === "23505") return { error: `Une ${vocab.recipeLower} avec ce nom existe déjà.` };
+    return { error: `Impossible d'enregistrer la ${vocab.recipeLower}.` };
   }
 
   revalidatePath(`/etablissements/${establishmentId}/recipes`);

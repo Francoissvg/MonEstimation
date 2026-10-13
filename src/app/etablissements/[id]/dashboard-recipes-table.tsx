@@ -6,6 +6,7 @@ import { money } from "@/lib/format";
 import { tableWrapClass, tableHeadClass, tableRowClass } from "@/lib/ui";
 import { compareValues, toggleSort, type SortState } from "@/lib/sort";
 import { SortHeader } from "@/components/sort-header";
+import { useVocabulary } from "@/components/vocabulary-provider";
 
 const LOW_MARGIN_RATE = 60;
 
@@ -38,6 +39,7 @@ export function DashboardRecipesTable({
   establishmentId: string;
   rows: DashboardRecipeRow[];
 }) {
+  const vocab = useVocabulary();
   const [sort, setSort] = useState<SortState<SortKey>>({ key: "nom", direction: "asc" });
 
   const sorted = useMemo(
@@ -63,13 +65,13 @@ export function DashboardRecipesTable({
       <table className="w-full min-w-[1040px] text-left text-sm">
         <thead className={tableHeadClass}>
           <tr>
-            <th className="px-4 py-3">{header("nom", "Recette")}</th>
-            <th className="px-4 py-3">{header("matterPerUnit", "Prix de fabrication / part")}</th>
-            <th className="px-4 py-3">{header("overheadPerUnit", "Frais associés / part")}</th>
-            <th className="px-4 py-3">{header("prix_vente", "Prix vente / part")}</th>
+            <th className="px-4 py-3">{header("nom", vocab.recipe)}</th>
+            <th className="px-4 py-3">{header("matterPerUnit", `Prix de fabrication / ${vocab.part}`)}</th>
+            <th className="px-4 py-3">{header("overheadPerUnit", `Frais associés / ${vocab.part}`)}</th>
+            <th className="px-4 py-3">{header("prix_vente", `Prix vente / ${vocab.part}`)}</th>
             <th className="px-4 py-3">{header("grossMargin", "Marge brute (sans frais)")}</th>
             <th className="px-4 py-3">{header("grossMarginRate", "Taux brut")}</th>
-            <th className="px-4 py-3">{header("margin", "Marge / part")}</th>
+            <th className="px-4 py-3">{header("margin", `Marge / ${vocab.part}`)}</th>
             <th className="px-4 py-3">{header("marginRate", "Taux")}</th>
           </tr>
         </thead>
@@ -113,7 +115,7 @@ export function DashboardRecipesTable({
           ) : (
             <tr>
               <td colSpan={8} className="px-4 py-8 text-center text-brand-muted">
-                Aucune recette pour l&apos;instant.{" "}
+                Aucune {vocab.recipeLower} pour l&apos;instant.{" "}
                 <Link href={`/etablissements/${establishmentId}/recipes`} className="underline">
                   Créez-en une
                 </Link>

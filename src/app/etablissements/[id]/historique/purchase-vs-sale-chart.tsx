@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { GroupedBarChart, type GroupedBarDatum } from "@/components/charts/grouped-bar-chart";
 import { inputClass } from "@/lib/ui";
+import { useVocabulary } from "@/components/vocabulary-provider";
 
 export type RecipeHistorySeries = {
   recipeNom: string;
@@ -10,6 +11,7 @@ export type RecipeHistorySeries = {
 };
 
 export function PurchaseVsSaleChart({ series }: { series: RecipeHistorySeries[] }) {
+  const vocab = useVocabulary();
   const [selected, setSelected] = useState(series[0]?.recipeNom ?? "");
   const current = useMemo(
     () => series.find((s) => s.recipeNom === selected) ?? series[0],
@@ -19,7 +21,7 @@ export function PurchaseVsSaleChart({ series }: { series: RecipeHistorySeries[] 
   if (!series.length) {
     return (
       <p className="text-sm text-brand-muted">
-        Ouvrez une recette et cliquez sur « Enregistrer dans l&apos;historique » pour commencer à
+        Ouvrez une {vocab.recipeLower} et cliquez sur « Enregistrer dans l&apos;historique » pour commencer à
         suivre l&apos;écart entre son coût de revient et son prix de vente dans le temps.
       </p>
     );
@@ -49,7 +51,7 @@ export function PurchaseVsSaleChart({ series }: { series: RecipeHistorySeries[] 
         series={[{ label: "Coût de revient" }, { label: "Prix de vente" }]}
         data={data}
         format="money"
-        emptyLabel="Pas assez de calculs enregistrés pour cette recette."
+        emptyLabel={`Pas assez de calculs enregistrés pour cette ${vocab.recipeLower}.`}
       />
     </div>
   );

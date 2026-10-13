@@ -1,7 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getEstablishment } from "@/lib/establishment.server";
+import { getVocabulary } from "@/lib/vocabulary";
 import { Sidebar } from "./sidebar";
 import { HelpLink } from "@/components/help-link";
+import { VocabularyProvider } from "@/components/vocabulary-provider";
 
 export default async function EstablishmentLayout({
   children,
@@ -19,30 +22,29 @@ export default async function EstablishmentLayout({
     redirect("/login");
   }
 
-  const { data: establishment } = await supabase
-    .from("establishments")
-    .select("id, nom, type")
-    .eq("id", id)
-    .single();
+  const establishment = await getEstablishment(id);
 
   if (!establishment) {
     notFound();
   }
 
   return (
-    <div className="flex min-h-screen w-full flex-1">
-      <Sidebar
-        establishmentId={establishment.id}
-        nom={establishment.nom}
-        type={establishment.type}
-        email={user.email ?? ""}
-      />
-      <div className="flex-1 bg-brand-bg">
-        <div className="flex justify-end border-b border-brand-line/70 bg-brand-bg px-6 py-2 print:hidden">
-          <HelpLink />
+    <VocabularyProvider vocabulary={getVocabulary(establishment.type)}>
+      <div className="flex min-h-screen w-full flex-1 flex-col lg:flex-row">
+        <Sidebar
+          establishmentId={establishment.id}
+          nom={establishment.nom}
+          type={establishment.type}
+          email={user.email ?? ""}
+        />
+        <div className="min-w-0 flex-1 bg-brand-bg">
+          {/* Sur téléphone, l'aide est dans le menu en tiroir. */}
+          <div className="hidden justify-end border-b border-brand-line/70 bg-brand-bg px-6 py-2 print:hidden lg:flex">
+            <HelpLink />
+          </div>
+          {children}
         </div>
-        {children}
       </div>
-    </div>
+    </VocabularyProvider>
   );
 }

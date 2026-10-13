@@ -11,6 +11,7 @@ import {
   type RecipeOverheadInput,
 } from "./costing";
 import { currentMonth, currentYear } from "./months";
+import { workshopMonthTotals, type WorkshopForCosting } from "./workshops";
 import { baseUnitFor, pricePerUsageUnit, toBaseQuantity } from "./units";
 
 export { currentMonth, currentYear };
@@ -40,7 +41,110 @@ export type MonthCostContext = {
   // prévisionnel (voir allocateOverhead dans costing.ts).
   overheadByRecipe: Record<string, number>;
   recipes: RecipeForCosting[];
+  // Ateliers (fleuristes) : ils absorbent aussi leur part des frais généraux,
+  // au prorata de leur CA prévisionnel, comme les recettes.
+  workshops: WorkshopForMonth[];
 };
+
+export type WorkshopRow = WorkshopForCosting & { id: string; nom: string };
+
+export type WorkshopForMonth = WorkshopRow & {
+  sessions: number; // séances prévues sur le mois
+  participants: number; // participants moyens par séance
+  overheadPerParticipant: number;
+};
+
+type WorkshopForecasts = Map<string, { sessions: number[]; participants: number[] }>;
+
+const WORKSHOP_COLUMNS =
+  "id, nom, prix_participant, duree_heures, cout_horaire, frais_seance, min_participants, max_participants";
+
+// Clé des ateliers dans allocateOverhead, pour ne pas croiser un id de recette.
+const workshopKey = (id: string) => `workshop:${id}`;
+
+// Ateliers de l'établissement + prévisionnel (séances, participants) des 12 mois.
+// Table absente (migration non appliquée) ou aucun atelier : liste vide.
+async function fetchWorkshops(
+  supabase: SupabaseClient,
+  establishmentId: string
+): Promise<{ workshops: WorkshopRow[]; forecasts: WorkshopForecasts }> {
+  const forecasts: WorkshopForecasts = new Map();
+  const { data: workshops } = await supabase
+    .from("workshops")
+    .select(WORKSHOP_COLUMNS)
+    .eq("establishment_id", establishmentId)
+    .order("nom");
+  if (!workshops?.length) return { workshops: [], forecasts };
+
+  for (const w of workshops) {
+    forecasts.set(w.id, { sessions: new Array(12).fill(0), participants: new Array(12).fill(0) });
+  }
+  const { data: rows } = await supabase
+    .from("workshop_monthly_forecasts")
+    .select("workshop_id, month, sessions, participants")
+    .in(
+      "workshop_id",
+      workshops.map((w) => w.id)
+    );
+  for (const row of rows ?? []) {
+    const f = forecasts.get(row.workshop_id);
+    if (!f) continue;
+    f.sessions[row.month - 1] = row.sessions;
+    f.participants[row.month - 1] = row.participants;
+  }
+  return { workshops, forecasts };
+}
+
+// Coût du kit d'UN participant et besoins en fournitures, pour chaque atelier.
+async function fetchWorkshopKits(
+  supabase: SupabaseClient,
+  workshopIds: string[]
+): Promise<Map<string, { cost: number; needs: PlanningIngredientNeed[] }>> {
+  const result = new Map<string, { cost: number; needs: PlanningIngredientNeed[] }>();
+  for (const id of workshopIds) result.set(id, { cost: 0, needs: [] });
+  if (!workshopIds.length) return result;
+
+  const { data: items } = await supabase
+    .from("workshop_items")
+    .select(
+      "workshop_id, quantite, unite, ingredient_id, ingredients(id, nom, purchase_quantity, purchase_unit, purchase_price)"
+    )
+    .in("workshop_id", workshopIds);
+
+  for (const item of items ?? []) {
+    const ingredient = Array.isArray(item.ingredients) ? (item.ingredients[0] ?? null) : item.ingredients;
+    const entry = result.get(item.workshop_id);
+    if (!entry || !ingredient) continue;
+    entry.cost += matterCost([{ quantite: item.quantite, unite: item.unite, ingredient }]);
+    entry.needs.push({
+      ingredientId: item.ingredient_id,
+      nom: ingredient.nom,
+      quantityPerBatch: toBaseQuantity(item.quantite, item.unite),
+      usageUnit: baseUnitFor(ingredient.purchase_unit),
+      unitPrice: pricePerUsageUnit(ingredient.purchase_quantity, ingredient.purchase_unit, ingredient.purchase_price),
+    });
+  }
+  return result;
+}
+
+// Un atelier est traité comme un produit vendu prix_participant, en
+// (séances x participants) exemplaires ; portions = 1, donc la quote-part
+// renvoyée par allocateOverhead est directement par participant.
+function workshopOverheadInputs(
+  workshops: WorkshopRow[],
+  forecasts: WorkshopForecasts,
+  monthIndex: number
+): RecipeOverheadInput[] {
+  return workshops.map((w) => {
+    const f = forecasts.get(w.id);
+    return {
+      id: workshopKey(w.id),
+      prixVente: w.prix_participant,
+      portions: 1,
+      forecastQuantity: (f?.sessions[monthIndex] ?? 0) * (f?.participants[monthIndex] ?? 0),
+    };
+  });
+}
 
 // Point d'entrée central : calcule les frais généraux du mois puis leur répartition
 // entre les recettes, en une seule fois (évite de refaire la même requête plusieurs fois).
@@ -49,8 +153,14 @@ export async function getMonthCostContext(
   establishmentId: string,
   month: number = currentMonth()
 ): Promise<MonthCostContext> {
-  const [{ data: settings }, { data: employees }, { data: fixedCosts }, { data: utilities }, { data: recipes }] =
-    await Promise.all([
+  const [
+    { data: settings },
+    { data: employees },
+    { data: fixedCosts },
+    { data: utilities },
+    { data: recipes },
+    workshopData,
+  ] = await Promise.all([
       supabase
         .from("establishment_settings")
         .select("marge_cible")
@@ -72,6 +182,7 @@ export async function getMonthCostContext(
         .select("id, nom, portions, prix_vente")
         .eq("establishment_id", establishmentId)
         .order("nom"),
+      fetchWorkshops(supabase, establishmentId),
     ]);
 
   const activeEmployees = (employees ?? []).filter((e) => isActiveInMonth(e.active_months, month));
@@ -108,9 +219,12 @@ export async function getMonthCostContext(
     margeCible,
   });
 
-  const overheadMap = allocateOverhead(overheadInputs, summary.total);
+  const overheadMap = allocateOverhead(
+    [...overheadInputs, ...workshopOverheadInputs(workshopData.workshops, workshopData.forecasts, month - 1)],
+    summary.total
+  );
   const overheadByRecipe: Record<string, number> = {};
-  for (const [id, value] of overheadMap) overheadByRecipe[id] = value;
+  for (const r of recipeList) overheadByRecipe[r.id] = overheadMap.get(r.id) ?? 0;
 
   return {
     summary,
@@ -119,6 +233,15 @@ export async function getMonthCostContext(
       ...r,
       forecast_quantity: forecastByRecipe.get(r.id) ?? 0,
     })),
+    workshops: workshopData.workshops.map((w) => {
+      const f = workshopData.forecasts.get(w.id);
+      return {
+        ...w,
+        sessions: f?.sessions[month - 1] ?? 0,
+        participants: f?.participants[month - 1] ?? 0,
+        overheadPerParticipant: overheadMap.get(workshopKey(w.id)) ?? 0,
+      };
+    }),
   };
 }
 
@@ -171,6 +294,43 @@ export async function getRecipesWithCost(
   });
 }
 
+export type WorkshopWithCost = WorkshopForMonth & {
+  kitCost: number; // kit d'un participant
+  monthRevenue: number;
+  monthDirectCost: number; // kits + frais de séance du mois, hors frais généraux
+};
+
+// Ateliers avec le coût du kit et les totaux du mois (CA, coûts directs).
+export async function getWorkshopsWithCost(
+  supabase: SupabaseClient,
+  establishmentId: string,
+  month: number = currentMonth()
+): Promise<WorkshopWithCost[]> {
+  const context = await getMonthCostContext(supabase, establishmentId, month);
+  if (!context.workshops.length) return [];
+  const kits = await fetchWorkshopKits(
+    supabase,
+    context.workshops.map((w) => w.id)
+  );
+  return context.workshops.map((w) => {
+    const kitCost = kits.get(w.id)?.cost ?? 0;
+    const totals = workshopMonthTotals({
+      workshop: w,
+      kitCostPerParticipant: kitCost,
+      sessions: w.sessions,
+      participants: w.participants,
+    });
+    return { ...w, kitCost, monthRevenue: totals.revenue, monthDirectCost: totals.directCost };
+  });
+}
+
+export type PlanningWorkshop = WorkshopRow & {
+  kitCost: number;
+  monthlySessions: number[]; // index 0 = janvier
+  monthlyParticipants: number[]; // participants moyens par séance, index 0 = janvier
+  ingredients: PlanningIngredientNeed[]; // kit d'UN participant
+};
+
 export type PlanningIngredientNeed = {
   ingredientId: string;
   nom: string;
@@ -191,6 +351,7 @@ export type PlanningRecipeData = {
 
 export type PlanningData = {
   recipes: PlanningRecipeData[];
+  workshops: PlanningWorkshop[];
   employees: { salary_mode: string; hourly_rate: number; hours_per_week: number; monthly_salary: number; active_months: number[] | null }[];
   fixedCosts: { montant: number; frequence: string; active_months: number[] | null }[];
   utilitiesByMonth: number[]; // moyenne historique par mois calendaire, index 0 = janvier
@@ -211,6 +372,7 @@ export async function getPlanningData(
     { data: fixedCosts },
     { data: utilities },
     { data: settings },
+    workshopData,
   ] = await Promise.all([
     supabase
       .from("recipes")
@@ -233,6 +395,7 @@ export async function getPlanningData(
       .select("marge_cible")
       .eq("establishment_id", establishmentId)
       .maybeSingle(),
+    fetchWorkshops(supabase, establishmentId),
   ]);
 
   const utilitiesByMonth = Array.from({ length: 12 }, (_, i) =>
@@ -241,9 +404,25 @@ export async function getPlanningData(
 
   const actualsYear = currentYear();
 
+  const kits = await fetchWorkshopKits(
+    supabase,
+    workshopData.workshops.map((w) => w.id)
+  );
+  const workshops: PlanningWorkshop[] = workshopData.workshops.map((w) => {
+    const f = workshopData.forecasts.get(w.id);
+    return {
+      ...w,
+      kitCost: kits.get(w.id)?.cost ?? 0,
+      monthlySessions: f?.sessions ?? new Array(12).fill(0),
+      monthlyParticipants: f?.participants ?? new Array(12).fill(0),
+      ingredients: kits.get(w.id)?.needs ?? [],
+    };
+  });
+
   if (!recipes?.length) {
     return {
       recipes: [],
+      workshops,
       employees: employees ?? [],
       fixedCosts: fixedCosts ?? [],
       utilitiesByMonth,
@@ -323,6 +502,7 @@ export async function getPlanningData(
       monthlyForecasts: forecastsByRecipe.get(recipe.id) ?? new Array(12).fill(0),
       ingredients: ingredientNeedsByRecipe.get(recipe.id) ?? [],
     })),
+    workshops,
     employees: employees ?? [],
     fixedCosts: fixedCosts ?? [],
     utilitiesByMonth,
@@ -356,6 +536,23 @@ export async function getStockNeeds(
       };
       existing.quantity += forecastQty * ingredient.quantityPerBatch;
       existing.cost += forecastQty * ingredient.quantityPerBatch * ingredient.unitPrice;
+      needs.set(ingredient.ingredientId, existing);
+    }
+  }
+
+  // Kits des ateliers : un kit par participant, sur toutes les séances du mois.
+  for (const workshop of planning.workshops) {
+    const kitsNeeded = (workshop.monthlySessions[month - 1] ?? 0) * (workshop.monthlyParticipants[month - 1] ?? 0);
+    if (kitsNeeded <= 0) continue;
+    for (const ingredient of workshop.ingredients) {
+      const existing = needs.get(ingredient.ingredientId) ?? {
+        nom: ingredient.nom,
+        usageUnit: ingredient.usageUnit,
+        quantity: 0,
+        cost: 0,
+      };
+      existing.quantity += kitsNeeded * ingredient.quantityPerBatch;
+      existing.cost += kitsNeeded * ingredient.quantityPerBatch * ingredient.unitPrice;
       needs.set(ingredient.ingredientId, existing);
     }
   }
@@ -440,12 +637,18 @@ export async function getAnnualRevenueForecast(
 ): Promise<AnnualRevenueForecast> {
   const byMonth = new Array(12).fill(0);
 
-  const { data: recipes } = await supabase
-    .from("recipes")
-    .select("id, portions, prix_vente")
-    .eq("establishment_id", establishmentId);
+  const [{ data: recipes }, workshopData] = await Promise.all([
+    supabase.from("recipes").select("id, portions, prix_vente").eq("establishment_id", establishmentId),
+    fetchWorkshops(supabase, establishmentId),
+  ]);
 
-  if (!recipes?.length) return { byMonth, total: 0 };
+  for (const w of workshopData.workshops) {
+    const f = workshopData.forecasts.get(w.id);
+    if (!f) continue;
+    for (let i = 0; i < 12; i++) byMonth[i] += f.sessions[i] * f.participants[i] * w.prix_participant;
+  }
+
+  if (!recipes?.length) return { byMonth, total: byMonth.reduce((sum, v) => sum + v, 0) };
 
   const ids = recipes.map((r) => r.id);
   const { data: forecasts } = await supabase

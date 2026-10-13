@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getEstablishmentVocabulary } from "@/lib/establishment.server";
 import { PURCHASE_UNITS } from "@/lib/constants";
 import { matterCost, recipeCostBreakdown } from "@/lib/costing";
 import { getMonthCostContext } from "@/lib/recipe-costs.server";
@@ -25,7 +26,7 @@ export async function saveRecipeIngredient(
   const unite = String(formData.get("unite") ?? "");
   const quantite = parsePositiveNumber(formData.get("quantite"));
 
-  if (!ingredientId) return { error: "Choisissez un ingrédient." };
+  if (!ingredientId) return { error: (await getEstablishmentVocabulary(establishmentId)).chooseIngredient };
   if (!(PURCHASE_UNITS as readonly string[]).includes(unite)) {
     return { error: "Unité invalide." };
   }
@@ -40,7 +41,7 @@ export async function saveRecipeIngredient(
     );
 
   if (error) {
-    return { error: "Impossible d'ajouter cet ingrédient." };
+    return { error: `Impossible d'ajouter ${(await getEstablishmentVocabulary(establishmentId)).thisIngredient}.` };
   }
 
   revalidatePath(`/etablissements/${establishmentId}/recipes/${recipeId}`);
@@ -77,7 +78,7 @@ export async function saveHistorySnapshot(
   ]);
 
   if (!recipe) {
-    return { error: "Recette introuvable." };
+    return { error: `${(await getEstablishmentVocabulary(establishmentId)).recipe} introuvable.` };
   }
 
   const matter = matterCost(

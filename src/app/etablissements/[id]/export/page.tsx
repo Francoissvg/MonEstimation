@@ -18,6 +18,7 @@ import { MONTH_LABELS, MONTH_SHORT_LABELS } from "@/lib/months";
 import { ExportPdfButton } from "@/components/export-pdf-button";
 import { ExportAllExcelButton, type FullExportData } from "./export-all-excel-button";
 import type { CostBreakdown } from "@/lib/costing";
+import { getEstablishmentVocabulary } from "@/lib/establishment.server";
 
 // Le coût total du mois doit toujours inclure l'intégralité des frais généraux
 // (overheadTotal) plus le coût matière de toutes les recettes prévisionnalisées,
@@ -44,6 +45,7 @@ export default async function ExportPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const vocab = await getEstablishmentVocabulary(id);
   const supabase = await createClient();
   const {
     data: { user },
@@ -157,7 +159,7 @@ export default async function ExportPage({
       const last = sorted[sorted.length - 1];
       const changeRate = first.unitPrice > 0 ? ((last.unitPrice - first.unitPrice) / first.unitPrice) * 100 : 0;
       return {
-        ingredientNom: ingredientNomById.get(ingredientId) ?? "Ingrédient",
+        ingredientNom: ingredientNomById.get(ingredientId) ?? vocab.ingredient,
         supplierNom: supplierNomById.get(supplierId) ?? "Fournisseur",
         firstPrice: first.unitPrice,
         lastPrice: last.unitPrice,
@@ -226,8 +228,8 @@ export default async function ExportPage({
   };
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10 print:px-0">
-      <div className="flex items-start justify-between gap-4">
+    <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 sm:py-10 print:px-0">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <Link href={`/etablissements/${id}`} className={`${ghostLinkClass} print:hidden`}>
             ← Tableau de bord
@@ -236,7 +238,7 @@ export default async function ExportPage({
             Export complet — {establishment.nom}
           </h1>
           <p className="mt-1 text-sm text-brand-muted">
-            Toutes les données chiffrées de l&apos;établissement (ingrédients, recettes, frais,
+            Toutes les données chiffrées de l&apos;établissement ({vocab.ingredientsLower}, {vocab.recipesLower}, frais,
             prévisionnel, rapport, historique) en un seul document — {MONTH_LABELS[month - 1]}.
           </p>
         </div>
@@ -248,7 +250,7 @@ export default async function ExportPage({
 
       <div className="mt-8 space-y-8">
         <section className={`p-5 ${cardClass} print:break-inside-avoid`}>
-          <h2 className="text-sm font-semibold text-brand-ink">Ingrédients ({ingredientRows.length})</h2>
+          <h2 className="text-sm font-semibold text-brand-ink">{vocab.ingredients} ({ingredientRows.length})</h2>
           <div className={`mt-3 ${tableWrapClass}`}>
             <table className="w-full min-w-[520px] text-left text-sm">
               <thead className={tableHeadClass}>
@@ -276,15 +278,15 @@ export default async function ExportPage({
         </section>
 
         <section className={`p-5 ${cardClass} print:break-inside-avoid`}>
-          <h2 className="text-sm font-semibold text-brand-ink">Recettes ({recipeRows.length})</h2>
+          <h2 className="text-sm font-semibold text-brand-ink">{vocab.recipes} ({recipeRows.length})</h2>
           <div className={`mt-3 ${tableWrapClass}`}>
             <table className="w-full min-w-[560px] text-left text-sm">
               <thead className={tableHeadClass}>
                 <tr>
-                  <th className="px-4 py-2">Recette</th>
-                  <th className="px-4 py-2">Prix vente / part</th>
-                  <th className="px-4 py-2">Coût revient / part</th>
-                  <th className="px-4 py-2">Marge / part</th>
+                  <th className="px-4 py-2">{vocab.recipe}</th>
+                  <th className="px-4 py-2">Prix vente / {vocab.part}</th>
+                  <th className="px-4 py-2">Coût revient / {vocab.part}</th>
+                  <th className="px-4 py-2">Marge / {vocab.part}</th>
                   <th className="px-4 py-2">Taux</th>
                 </tr>
               </thead>
@@ -375,12 +377,12 @@ export default async function ExportPage({
         </section>
 
         <section className={`p-5 ${cardClass} print:break-inside-avoid`}>
-          <h2 className="text-sm font-semibold text-brand-ink">Prévisionnel mensuel par recette</h2>
+          <h2 className="text-sm font-semibold text-brand-ink">Prévisionnel mensuel par {vocab.recipeLower}</h2>
           <div className={`mt-3 ${tableWrapClass}`}>
             <table className="w-full min-w-[900px] text-left text-sm">
               <thead className={tableHeadClass}>
                 <tr>
-                  <th className="px-4 py-2">Recette</th>
+                  <th className="px-4 py-2">{vocab.recipe}</th>
                   {MONTH_SHORT_LABELS.map((label) => (
                     <th key={label} className="px-2 py-2 text-center">
                       {label}
@@ -433,7 +435,7 @@ export default async function ExportPage({
             <table className="w-full text-left text-sm">
               <thead className={tableHeadClass}>
                 <tr>
-                  <th className="px-4 py-2">Recette</th>
+                  <th className="px-4 py-2">{vocab.recipe}</th>
                   <th className="px-4 py-2">Prévisionnel</th>
                   <th className="px-4 py-2">Réalisé</th>
                 </tr>
@@ -483,7 +485,7 @@ export default async function ExportPage({
             <table className="w-full text-left text-sm">
               <thead className={tableHeadClass}>
                 <tr>
-                  <th className="px-4 py-2">Ingrédient</th>
+                  <th className="px-4 py-2">{vocab.ingredient}</th>
                   <th className="px-4 py-2">Fournisseur</th>
                   <th className="px-4 py-2">Premier prix</th>
                   <th className="px-4 py-2">Dernier prix</th>
@@ -521,7 +523,7 @@ export default async function ExportPage({
               <thead className={tableHeadClass}>
                 <tr>
                   <th className="px-4 py-2">Date</th>
-                  <th className="px-4 py-2">Recette</th>
+                  <th className="px-4 py-2">{vocab.recipe}</th>
                   <th className="px-4 py-2">Coût revient</th>
                   <th className="px-4 py-2">Prix vente</th>
                   <th className="px-4 py-2">Marge</th>

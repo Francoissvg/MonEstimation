@@ -2,7 +2,8 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { saveIngredient, type FormState } from "./actions";
-import { INGREDIENT_CATEGORIES, PURCHASE_UNITS } from "@/lib/constants";
+import { PURCHASE_UNITS } from "@/lib/constants";
+import { useVocabulary } from "@/components/vocabulary-provider";
 import { cardClass, inputClass, labelClass, primaryButtonClass, secondaryButtonClass } from "@/lib/ui";
 
 export type IngredientRow = {
@@ -19,7 +20,6 @@ const UNIT_LABELS: Record<string, string> = {
   kg: "kg",
   ml: "ml",
   l: "l",
-  piece: "pièce(s)",
 };
 
 const initialState: FormState = { error: null };
@@ -34,6 +34,7 @@ export function IngredientForm({
   onDone: () => void;
 }) {
   const [state, formAction, pending] = useActionState(saveIngredient, initialState);
+  const vocab = useVocabulary();
   const formRef = useRef<HTMLFormElement>(null);
   const wasPending = useRef(false);
 
@@ -63,7 +64,7 @@ export function IngredientForm({
           required
           defaultValue={editing?.nom ?? ""}
           key={`nom-${editing?.id ?? "new"}`}
-          placeholder="Ex : Farine T55"
+          placeholder={vocab.ingredientPlaceholder}
           className={inputClass}
         />
       </div>
@@ -72,11 +73,15 @@ export function IngredientForm({
         <label className={labelClass}>Catégorie</label>
         <select
           name="categorie"
-          defaultValue={editing?.categorie ?? INGREDIENT_CATEGORIES[0]}
+          defaultValue={editing?.categorie ?? vocab.categories[0]}
           key={`cat-${editing?.id ?? "new"}`}
           className={inputClass}
         >
-          {INGREDIENT_CATEGORIES.map((category) => (
+          {/* Une catégorie héritée d'un autre métier reste sélectionnable en modification. */}
+          {(editing && !vocab.categories.includes(editing.categorie)
+            ? [editing.categorie, ...vocab.categories]
+            : vocab.categories
+          ).map((category) => (
             <option key={category} value={category}>
               {category}
             </option>
@@ -102,13 +107,13 @@ export function IngredientForm({
         <label className={labelClass}>Unité d&apos;achat</label>
         <select
           name="purchase_unit"
-          defaultValue={editing?.purchase_unit ?? "kg"}
+          defaultValue={editing?.purchase_unit ?? vocab.defaultPurchaseUnit}
           key={`unit-${editing?.id ?? "new"}`}
           className={inputClass}
         >
           {PURCHASE_UNITS.map((unit) => (
             <option key={unit} value={unit}>
-              {UNIT_LABELS[unit]}
+              {unit === "piece" ? vocab.pieceLabel : UNIT_LABELS[unit]}
             </option>
           ))}
         </select>
@@ -130,7 +135,7 @@ export function IngredientForm({
 
       <div className="col-span-2 flex items-end gap-2 sm:col-span-4">
         <button type="submit" disabled={pending} className={primaryButtonClass}>
-          {pending ? "Enregistrement..." : editing ? "Mettre à jour" : "Ajouter l'ingrédient"}
+          {pending ? "Enregistrement..." : editing ? "Mettre à jour" : `Ajouter ${vocab.theIngredient}`}
         </button>
         {editing ? (
           <button type="button" onClick={onDone} className={secondaryButtonClass}>

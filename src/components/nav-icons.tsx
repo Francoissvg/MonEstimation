@@ -96,3 +96,15 @@ export function HelpIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+// Groupe de personnes autour d'une table : les ateliers de création.
+export function WorkshopIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base} {...props}>
+      <circle cx="7" cy="7" r="2.25" />
+      <circle cx="17" cy="7" r="2.25" />
+      <path d="M3.5 14.5c.4-2 1.8-3.25 3.5-3.25s3.1 1.25 3.5 3.25M13.5 14.5c.4-2 1.8-3.25 3.5-3.25s3.1 1.25 3.5 3.25" />
+      <path d="M3 17.5h18M6 17.5V21M18 17.5V21" />
+    </svg>
+  );
+}

@@ -7,6 +7,7 @@ import { compareValues, toggleSort, type SortState } from "@/lib/sort";
 import { SortHeader } from "@/components/sort-header";
 import { SearchInput } from "@/components/search-input";
 import { RankedBarChart, type RankedBarDatum } from "@/components/charts/ranked-bar-chart";
+import { useVocabulary } from "@/components/vocabulary-provider";
 
 export type SupplierPriceRow = {
   ingredientId: string;
@@ -28,6 +29,7 @@ function formatDate(value: string): string {
 }
 
 export function SupplierPriceReport({ rows }: { rows: SupplierPriceRow[] }) {
+  const vocab = useVocabulary();
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortState<SortKey>>({ key: "changeRate", direction: "desc" });
 
@@ -66,7 +68,7 @@ export function SupplierPriceReport({ rows }: { rows: SupplierPriceRow[] }) {
   if (!rows.length) {
     return (
       <p className="text-sm text-brand-muted">
-        Associez un fournisseur à au moins deux achats d&apos;un même ingrédient (page Ingrédients →
+        Associez un fournisseur à au moins deux achats de {vocab.sameIngredient} (page {vocab.ingredients} →
         Historique) pour voir apparaître ce rapport.
       </p>
     );
@@ -83,14 +85,14 @@ export function SupplierPriceReport({ rows }: { rows: SupplierPriceRow[] }) {
       </div>
 
       <div className="max-w-xs">
-        <SearchInput value={search} onChange={setSearch} placeholder="Rechercher un ingrédient ou fournisseur..." />
+        <SearchInput value={search} onChange={setSearch} placeholder={`Rechercher ${vocab.anIngredient} ou un fournisseur...`} />
       </div>
 
       <div className={tableWrapClass}>
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead className={tableHeadClass}>
             <tr>
-              <th className="px-4 py-3">{header("ingredientNom", "Ingrédient")}</th>
+              <th className="px-4 py-3">{header("ingredientNom", vocab.ingredient)}</th>
               <th className="px-4 py-3">{header("supplierNom", "Fournisseur")}</th>
               <th className="px-4 py-3">{header("firstPrice", "Premier prix")}</th>
               <th className="px-4 py-3">{header("lastPrice", "Dernier prix")}</th>

@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { IngredientsManager } from "./ingredients-manager";
+import { getEstablishmentVocabulary } from "@/lib/establishment.server";
 import type { PurchaseRow } from "./purchase-history";
 
 export default async function IngredientsPage({
@@ -26,6 +27,8 @@ export default async function IngredientsPage({
   if (!establishment) {
     notFound();
   }
+
+  const vocab = await getEstablishmentVocabulary(id);
 
   const [{ data: ingredients }, { data: purchases }, { data: suppliers }] = await Promise.all([
     supabase
@@ -53,11 +56,11 @@ export default async function IngredientsPage({
   }
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
-      <h1 className="text-2xl font-semibold tracking-tight text-brand-ink">Ingrédients</h1>
+    <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 sm:py-10">
+      <h1 className="text-2xl font-semibold tracking-tight text-brand-ink">{vocab.ingredients}</h1>
       <p className="mt-1 text-sm text-brand-muted">
         Le coût unitaire (par g, ml ou pièce) est calculé automatiquement à partir du prix et de
-        la quantité du paquet acheté. Utilisez « Historique » pour comparer vos achats dans le
+        la quantité {vocab.purchaseLot}. Utilisez « Historique » pour comparer vos achats dans le
         temps.
       </p>
 

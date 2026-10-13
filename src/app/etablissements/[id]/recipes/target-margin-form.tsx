@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { saveTargetMargin, type FormState } from "../parametres/actions";
 import { cardClass, inputClass, labelClass, primaryButtonClass } from "@/lib/ui";
+import { useVocabulary } from "@/components/vocabulary-provider";
 
 const initialState: FormState = { error: null };
 
@@ -13,6 +14,7 @@ export function TargetMarginForm({
   establishmentId: string;
   margeCible: number;
 }) {
+  const vocab = useVocabulary();
   const [state, formAction, pending] = useActionState(saveTargetMargin, initialState);
 
   return (
@@ -22,7 +24,7 @@ export function TargetMarginForm({
       <div className="flex-1">
         <label className={labelClass}>Marge cible</label>
         <p className="mt-1 text-xs text-brand-muted">
-          Utilisée pour calculer le prix conseillé de toutes vos recettes.
+          Utilisée pour calculer le prix conseillé de toutes vos {vocab.recipesLower}.
         </p>
         <input
           name="marge_cible"

@@ -2,9 +2,11 @@
 
 import { useMemo, useTransition } from "react";
 import { deleteRecipeIngredient } from "./actions";
+import { deleteWorkshopItem } from "../../ateliers/actions";
 import { pricePerUsageUnit, toBaseQuantity } from "@/lib/units";
 import { moneyPrecise, number } from "@/lib/format";
 import { dangerLinkClass, tableWrapClass, tableHeadClass, tableRowClass } from "@/lib/ui";
+import { useVocabulary } from "@/components/vocabulary-provider";
 
 export type AvailableIngredient = {
   id: string;
@@ -28,18 +30,21 @@ const UNIT_LABELS: Record<string, string> = {
   kg: "kg",
   ml: "ml",
   l: "l",
-  piece: "pièce(s)",
 };
 
+// Éléments d'une recette ou du kit d'un atelier (`target`), avec leur coût.
 export function RecipeIngredientsManager({
   establishmentId,
-  recipeId,
+  ownerId,
   items,
+  target = "recipe",
 }: {
   establishmentId: string;
-  recipeId: string;
+  ownerId: string; // id de la recette ou de l'atelier
   items: RecipeIngredientRow[];
+  target?: "recipe" | "workshop";
 }) {
+  const vocab = useVocabulary();
   const [deleting, startDeleteTransition] = useTransition();
 
   const rows = useMemo(
@@ -61,7 +66,7 @@ export function RecipeIngredientsManager({
       <table className="w-full min-w-[420px] text-left text-sm">
         <thead className={tableHeadClass}>
           <tr>
-            <th className="px-4 py-3">Ingrédient</th>
+            <th className="px-4 py-3">{vocab.ingredient}</th>
             <th className="px-4 py-3">Quantité</th>
             <th className="px-4 py-3">Coût</th>
             <th className="px-4 py-3" />
@@ -73,7 +78,7 @@ export function RecipeIngredientsManager({
               <tr key={row.id} className={tableRowClass}>
                 <td className="px-4 py-3 font-medium text-brand-ink">{row.ingredient.nom}</td>
                 <td className="px-4 py-3 text-brand-muted">
-                  {number(row.quantite)} {UNIT_LABELS[row.unite]}
+                  {number(row.quantite)} {row.unite === "piece" ? vocab.pieceLabel : UNIT_LABELS[row.unite]}
                 </td>
                 <td className="px-4 py-3 text-brand-muted">{moneyPrecise(row.cost)}</td>
                 <td className="px-4 py-3 text-right">
@@ -82,7 +87,9 @@ export function RecipeIngredientsManager({
                     disabled={deleting}
                     onClick={() =>
                       startDeleteTransition(() =>
-                        deleteRecipeIngredient(row.id, establishmentId, recipeId)
+                        target === "workshop"
+                          ? deleteWorkshopItem(row.id, establishmentId, ownerId)
+                          : deleteRecipeIngredient(row.id, establishmentId, ownerId)
                       )
                     }
                     className={dangerLinkClass}
@@ -95,7 +102,7 @@ export function RecipeIngredientsManager({
           ) : (
             <tr>
               <td colSpan={4} className="px-4 py-8 text-center text-brand-muted">
-                Aucun ingrédient ajouté. Cliquez-en un à gauche pour l&apos;ajouter.
+                {vocab.noIngredient} pour l&apos;instant. Cliquez sur un élément à gauche pour l&apos;ajouter.
               </td>
             </tr>
           )}

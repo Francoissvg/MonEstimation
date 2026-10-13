@@ -1,6 +1,8 @@
 "use client";
 
 import { secondaryButtonClass } from "@/lib/ui";
+import type { Vocabulary } from "@/lib/vocabulary";
+import { useVocabulary } from "@/components/vocabulary-provider";
 
 export type RapportExportData = {
   month: string;
@@ -27,7 +29,7 @@ function formatNumber(value: number): string {
 }
 
 // Séparateur point-virgule + décimales à la virgule : convention Excel en locale française.
-function buildCsv(data: RapportExportData): string {
+function buildCsv(data: RapportExportData, vocab: Vocabulary): string {
   const lines: string[] = [];
   const row = (...cells: (string | number)[]) => lines.push(cells.map(csvEscape).join(";"));
 
@@ -40,7 +42,7 @@ function buildCsv(data: RapportExportData): string {
   row("Marge (€)", formatNumber(data.currentTotals.margin), formatNumber(data.prevTotals.margin));
   lines.push("");
 
-  row("Marge par recette", "Taux de marge brute (%, sans les frais)", "Taux de marge (%)");
+  row(`Marge par ${vocab.recipeLower}`, "Taux de marge brute (%, sans les frais)", "Taux de marge (%)");
   for (const r of data.marginByRecipe) row(r.nom, formatNumber(r.tauxMargeBrute), formatNumber(r.tauxMarge));
   lines.push("");
 
@@ -48,7 +50,7 @@ function buildCsv(data: RapportExportData): string {
   for (const o of data.overhead) row(o.label, formatNumber(o.value));
   lines.push("");
 
-  row("CA vs coût projeté par recette", "CA (€)", "Coût (€)");
+  row(`CA vs coût projeté par ${vocab.recipeLower}`, "CA (€)", "Coût (€)");
   for (const c of data.caVsCout) row(c.nom, formatNumber(c.ca), formatNumber(c.cout));
   lines.push("");
 
@@ -67,8 +69,9 @@ function buildCsv(data: RapportExportData): string {
 }
 
 export function ExportExcelButton({ data }: { data: RapportExportData }) {
+  const vocab = useVocabulary();
   const handleClick = () => {
-    const csv = buildCsv(data);
+    const csv = buildCsv(data, vocab);
     const bom = "﻿";
     const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);

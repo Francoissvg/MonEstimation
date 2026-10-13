@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getMonthlyCostsSummary } from "@/lib/recipe-costs.server";
 import { FraisManager } from "./frais-manager";
+import { getEstablishmentVocabulary } from "@/lib/establishment.server";
 
 export default async function ParametresPage({
   params,
@@ -9,6 +10,7 @@ export default async function ParametresPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const vocab = await getEstablishmentVocabulary(id);
   const supabase = await createClient();
   const {
     data: { user },
@@ -37,11 +39,11 @@ export default async function ParametresPage({
   ]);
 
   return (
-    <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-10">
+    <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6 sm:px-6 sm:py-10">
       <h1 className="text-2xl font-semibold tracking-tight text-brand-ink">Frais généraux</h1>
       <p className="mt-1 text-sm text-brand-muted">
-        Salariés, charges fixes et énergie sont additionnés puis répartis sur vos recettes pour
-        obtenir une quote-part de frais en plus du coût matière.
+        Salariés, charges fixes et énergie sont additionnés puis répartis sur vos{" "}
+        {vocab.recipesLower} pour obtenir une quote-part de frais en plus du {vocab.matterCostLower}.
       </p>
 
       <div className="mt-6">

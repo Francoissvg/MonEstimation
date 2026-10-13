@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { STARTER_TEMPLATES } from "./starter-templates";
 import { baseUnitFor } from "./units";
+import { getVocabulary } from "./vocabulary";
 
 export async function seedStarterData(
   supabase: SupabaseClient,
@@ -9,6 +10,7 @@ export async function seedStarterData(
 ): Promise<{ error: string | null }> {
   const template = STARTER_TEMPLATES[type];
   if (!template) return { error: null };
+  const vocab = getVocabulary(type);
 
   const { data: insertedIngredients, error: ingredientsError } = await supabase
     .from("ingredients")
@@ -26,7 +28,7 @@ export async function seedStarterData(
     .select("id, nom");
 
   if (ingredientsError || !insertedIngredients) {
-    return { error: "Impossible d'ajouter les ingrédients de départ." };
+    return { error: `Impossible d'ajouter les ${vocab.ingredientsLower} de départ.` };
   }
 
   const ingredientIdByNom = new Map(insertedIngredients.map((row) => [row.nom, row.id]));
@@ -44,7 +46,9 @@ export async function seedStarterData(
     .select("id, nom");
 
   if (recipesError || !insertedRecipes) {
-    return { error: "Ingrédients ajoutés, mais impossible d'ajouter les recettes de départ." };
+    return {
+      error: `${vocab.ingredients} en place, mais impossible d'ajouter les ${vocab.recipesLower} de départ.`,
+    };
   }
 
   const recipeIdByNom = new Map(insertedRecipes.map((row) => [row.nom, row.id]));
@@ -69,7 +73,9 @@ export async function seedStarterData(
   const { error: linksError } = await supabase.from("recipe_ingredients").insert(recipeIngredientRows);
 
   if (linksError) {
-    return { error: "Recettes créées, mais impossible d'y ajouter les ingrédients." };
+    return {
+      error: `${vocab.recipes} créées, mais impossible d'y ajouter les ${vocab.ingredientsLower}.`,
+    };
   }
 
   return { error: null };

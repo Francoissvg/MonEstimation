@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { getMonthlyCostsSummary, getRecipesWithCost } from "@/lib/recipe-costs.server";
+import { getMonthlyCostsSummary, getRecipesWithCost, getWorkshopsWithCost } from "@/lib/recipe-costs.server";
 import { StatTile } from "@/components/stat-tile";
 import { GroupedBarChart } from "@/components/charts/grouped-bar-chart";
 import { money, number } from "@/lib/format";
@@ -9,6 +9,7 @@ import { MONTH_LABELS } from "@/lib/months";
 import { cardClass, cardHoverClass } from "@/lib/ui";
 import { DashboardRecipesTable } from "./dashboard-recipes-table";
 import { ExportIcon, ForecastIcon, FraisIcon, IngredientsIcon, ReportIcon } from "@/components/nav-icons";
+import { getEstablishmentVocabulary } from "@/lib/establishment.server";
 
 const LOW_MARGIN_RATE = 60;
 
@@ -26,6 +27,7 @@ export default async function DashboardPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const vocab = await getEstablishmentVocabulary(id);
   const supabase = await createClient();
   const {
     data: { user },
@@ -34,10 +36,11 @@ export default async function DashboardPage({
     redirect("/login");
   }
 
-  const [recipesWithCost, summary, { count: ingredientsCount }] = await Promise.all([
+  const [recipesWithCost, summary, { count: ingredientsCount }, workshops] = await Promise.all([
     getRecipesWithCost(supabase, id),
     getMonthlyCostsSummary(supabase, id),
     supabase.from("ingredients").select("id", { count: "exact", head: true }).eq("establishment_id", id),
+    vocab.hasWorkshops ? getWorkshopsWithCost(supabase, id) : Promise.resolve([]),
   ]);
 
   const priced = recipesWithCost.filter((r) => r.recipe.prix_vente > 0);
@@ -53,7 +56,7 @@ export default async function DashboardPage({
 
   const lowMarginCount = priced.filter((r) => r.breakdown.marginRate < LOW_MARGIN_RATE).length;
 
-  const monthRevenue = recipesWithCost.reduce((sum, r) => {
+  const recipesRevenue = recipesWithCost.reduce((sum, r) => {
     if (r.recipe.prix_vente <= 0 || r.recipe.forecast_quantity <= 0) return sum;
     return sum + r.recipe.forecast_quantity * r.recipe.portions * r.recipe.prix_vente;
   }, 0);
@@ -64,7 +67,12 @@ export default async function DashboardPage({
     if (r.recipe.forecast_quantity <= 0) return sum;
     return sum + r.recipe.forecast_quantity * r.breakdown.matter;
   }, 0);
-  const monthCost = summary.total + monthMatterCost;
+  // Ateliers (fleuristes) : leur CA et leurs coûts directs (kits + frais de séance)
+  // s'ajoutent ; leur quote-part de frais généraux est déjà dans summary.total.
+  const workshopsRevenue = workshops.reduce((sum, w) => sum + w.monthRevenue, 0);
+  const workshopsDirectCost = workshops.reduce((sum, w) => sum + w.monthDirectCost, 0);
+  const monthCost = summary.total + monthMatterCost + workshopsDirectCost;
+  const monthRevenue = recipesRevenue + workshopsRevenue;
   const incompleteCount = recipesWithCost.filter(
     (r) => r.recipe.prix_vente <= 0 || r.recipe.forecast_quantity <= 0
   ).length;
@@ -80,11 +88,11 @@ export default async function DashboardPage({
     .slice(0, 6);
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
+    <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 sm:py-10">
       <p className="text-xs font-semibold uppercase tracking-wide text-brand-accent">Aperçu</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight text-brand-ink">Tableau de bord</h1>
       <p className="mt-1 text-sm text-brand-muted">
-        Vue d&apos;ensemble de vos recettes et de leur rentabilité — {MONTH_LABELS[new Date().getMonth()]}.
+        Vue d&apos;ensemble de vos {vocab.recipesLower} et de leur rentabilité — {MONTH_LABELS[new Date().getMonth()]}.
       </p>
 
       {isEmpty ? (
@@ -92,7 +100,8 @@ export default async function DashboardPage({
           <p className="text-2xl">👋</p>
           <p className="mt-2 text-sm font-medium text-brand-ink">Bienvenue sur votre établissement</p>
           <p className="mt-1 text-sm text-brand-muted">
-            Commencez par ajouter vos ingrédients, puis créez vos premières recettes pour voir
+            Commencez par ajouter vos {vocab.ingredientsLower}, puis créez vos premières{" "}
+            {vocab.recipesLower} pour voir
             apparaître leur coût de revient et leur marge ici.
           </p>
           <div className="mt-4 flex justify-center gap-3">
@@ -100,20 +109,20 @@ export default async function DashboardPage({
               href={`/etablissements/${id}/ingredients`}
               className="inline-flex items-center justify-center rounded-lg bg-gradient-to-b from-brand-accent to-brand-accent-dark px-4 py-2 text-sm font-medium text-white shadow-sm hover:shadow-md"
             >
-              Ajouter des ingrédients
+              Ajouter des {vocab.ingredientsLower}
             </Link>
             <Link
               href={`/etablissements/${id}/recipes`}
               className="inline-flex items-center justify-center rounded-lg border border-brand-line bg-white px-4 py-2 text-sm font-medium text-brand-ink hover:bg-brand-panel-soft"
             >
-              Créer une recette
+              Créer une {vocab.recipeLower}
             </Link>
           </div>
         </div>
       ) : null}
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatTile label="Recettes" value={number(recipesWithCost.length)} icon="📖" />
+        <StatTile label={vocab.recipes} value={number(recipesWithCost.length)} icon="📖" />
         <StatTile
           label="Marge moyenne"
           value={priced.length ? `${averageMarginRate.toFixed(1)}%` : "-"}
@@ -148,7 +157,7 @@ export default async function DashboardPage({
           icon="📊"
         />
         <StatTile
-          label="Recettes incomplètes"
+          label={`${vocab.recipes} incomplètes`}
           value={incompleteCount ? number(incompleteCount) : "OK"}
           tone={incompleteCount ? "warning" : "success"}
           icon="✏️"
@@ -158,13 +167,13 @@ export default async function DashboardPage({
       {marginComparisonData.length ? (
         <div className={`mt-8 p-5 ${cardClass}`}>
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-brand-ink">Marge par recette</h2>
+            <h2 className="text-sm font-semibold text-brand-ink">Marge par {vocab.recipeLower}</h2>
             <Link href={`/etablissements/${id}/rapport`} className="text-xs font-medium text-brand-accent hover:underline">
               Rapport complet →
             </Link>
           </div>
           <p className="mt-0.5 mb-4 text-xs text-brand-muted">
-            Marge brute (sans les frais) comparée à la marge nette — top recettes par taux de marge
+            Marge brute (sans les frais) comparée à la marge nette — top {vocab.recipesLower} par taux de marge
             nette.
           </p>
           <GroupedBarChart
@@ -185,16 +194,18 @@ export default async function DashboardPage({
             <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-panel-soft text-brand-accent-dark">
               <link.icon className="h-5 w-5" />
             </span>
-            <p className="mt-2 text-sm font-semibold text-brand-ink">{link.label}</p>
+            <p className="mt-2 text-sm font-semibold text-brand-ink">
+              {link.href === "ingredients" ? vocab.ingredients : link.label}
+            </p>
             <p className="mt-0.5 text-xs text-brand-muted">{link.description}</p>
           </Link>
         ))}
       </div>
 
       <div className="mt-10 flex items-center justify-between">
-        <h2 className="text-lg font-semibold tracking-tight text-brand-ink">Vos recettes</h2>
+        <h2 className="text-lg font-semibold tracking-tight text-brand-ink">Vos {vocab.recipesLower}</h2>
         <Link href={`/etablissements/${id}/recipes`} className="text-sm font-medium text-brand-accent hover:underline">
-          Gérer les recettes →
+          Gérer les {vocab.recipesLower} →
         </Link>
       </div>
 

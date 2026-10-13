@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { baseUnitFor } from "@/lib/units";
-import { INGREDIENT_CATEGORIES, PURCHASE_UNITS } from "@/lib/constants";
+import { PURCHASE_UNITS } from "@/lib/constants";
+import { ALL_INGREDIENT_CATEGORIES } from "@/lib/vocabulary";
+import { getEstablishmentVocabulary } from "@/lib/establishment.server";
 
 export type FormState = { error: string | null };
 
@@ -27,7 +29,7 @@ export async function saveIngredient(
   const purchasePrice = parsePositiveNumber(formData.get("purchase_price"));
 
   if (!nom) return { error: "Le nom est obligatoire." };
-  if (!(INGREDIENT_CATEGORIES as readonly string[]).includes(categorie)) {
+  if (!ALL_INGREDIENT_CATEGORIES.includes(categorie)) {
     return { error: "Catégorie invalide." };
   }
   if (!(PURCHASE_UNITS as readonly string[]).includes(purchaseUnit)) {
@@ -57,9 +59,11 @@ export async function saveIngredient(
 
   if (error) {
     if (error.code === "23505") {
-      return { error: "Un ingrédient avec ce nom existe déjà." };
+      return { error: (await getEstablishmentVocabulary(establishmentId)).ingredientExists };
     }
-    return { error: "Impossible d'enregistrer l'ingrédient." };
+    return {
+      error: `Impossible d'enregistrer ${(await getEstablishmentVocabulary(establishmentId)).theIngredient}.`,
+    };
   }
 
   revalidatePath(`/etablissements/${establishmentId}/ingredients`);
@@ -120,7 +124,7 @@ export async function addIngredientPurchase(
   const supplierIdRaw = String(formData.get("supplier_id") ?? "").trim();
   const supplierId = supplierIdRaw ? supplierIdRaw : null;
 
-  if (!ingredientId) return { error: "Ingrédient introuvable." };
+  if (!ingredientId) return { error: (await getEstablishmentVocabulary(establishmentId)).ingredientNotFound };
   if (!purchasedAt) return { error: "La date est obligatoire." };
   if (!(PURCHASE_UNITS as readonly string[]).includes(unit)) {
     return { error: "Unité invalide." };

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { updateMonthlyForecast, updateMonthlyActual } from "../recipes/actions";
 import {
   allocateOverhead,
@@ -14,8 +14,11 @@ import {
 } from "@/lib/costing";
 import { StatTile } from "@/components/stat-tile";
 import { money, number } from "@/lib/format";
-import { inputClass, tableWrapClass, tableHeadClass, tableRowClass } from "@/lib/ui";
+import { cardClass, inputClass, tableWrapClass, tableHeadClass, tableRowClass } from "@/lib/ui";
 import { MONTH_LABELS, MONTH_SHORT_LABELS } from "@/lib/months";
+import { useVocabulary } from "@/components/vocabulary-provider";
+import { sessionFixedCost } from "@/lib/workshops";
+import type { PlanningWorkshop } from "@/lib/recipe-costs.server";
 
 export type PlanningIngredientNeed = {
   ingredientId: string;
@@ -107,14 +110,14 @@ function RowFillControl({ onApply }: { onApply: (value: number) => void }) {
             handleApply();
           }
         }}
-        className="w-12 rounded border border-brand-line px-1 py-0.5 text-right text-xs text-brand-ink disabled:opacity-60"
+        className="w-16 rounded border border-brand-line px-1 py-1 text-right text-base text-brand-ink disabled:opacity-60 sm:w-12 sm:py-0.5 sm:text-xs"
         title="Quantité à appliquer aux 12 mois"
       />
       <button
         type="button"
         onClick={handleApply}
         disabled={pending || !text}
-        className="rounded border border-brand-line px-1.5 py-0.5 text-[10px] font-medium text-brand-muted transition-colors hover:border-brand-accent hover:text-brand-accent-dark disabled:opacity-40"
+        className="rounded border border-brand-line px-2 py-1.5 text-xs font-medium sm:px-1.5 sm:py-0.5 sm:text-[10px] text-brand-muted transition-colors hover:border-brand-accent hover:text-brand-accent-dark disabled:opacity-40"
         title="Appliquer cette quantité aux 12 mois"
       >
         Tout l&apos;an
@@ -126,6 +129,7 @@ function RowFillControl({ onApply }: { onApply: (value: number) => void }) {
 export function PlanningView({
   establishmentId,
   recipes,
+  workshops,
   employees,
   fixedCosts,
   utilitiesByMonth,
@@ -135,6 +139,7 @@ export function PlanningView({
 }: {
   establishmentId: string;
   recipes: PlanningRecipe[];
+  workshops: PlanningWorkshop[];
   employees: EmployeeForCosting[];
   fixedCosts: FixedCostForCosting[];
   utilitiesByMonth: number[];
@@ -142,6 +147,7 @@ export function PlanningView({
   actuals: Record<string, number[]>;
   actualsYear: number;
 }) {
+  const vocab = useVocabulary();
   const [forecasts, setForecasts] = useState<Record<string, number[]>>(() =>
     Object.fromEntries(recipes.map((r) => [r.id, [...r.monthlyForecasts]]))
   );
@@ -150,6 +156,15 @@ export function PlanningView({
   );
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth()); // 0-11
+  const monthBarRef = useRef<HTMLDivElement>(null);
+
+  // Sur téléphone, la barre des mois défile : on centre le mois choisi pour qu'il reste visible.
+  useEffect(() => {
+    const bar = monthBarRef.current;
+    const button = bar?.children[selectedMonth] as HTMLElement | undefined;
+    if (!bar || !button || bar.scrollWidth <= bar.clientWidth) return;
+    bar.scrollLeft = button.offsetLeft - bar.clientWidth / 2 + button.clientWidth / 2;
+  }, [selectedMonth]);
 
   const setCell = (recipeId: string, monthIndex: number, value: number) => {
     setForecasts((current) => {
@@ -199,7 +214,15 @@ export function PlanningView({
         forecastQuantity: totalPartsForecast,
         margeCible,
       });
-      const overheadByRecipe = allocateOverhead(overheadInputs, summary.total);
+      // Les ateliers absorbent aussi leur part des frais (même logique que côté serveur,
+      // voir getMonthCostContext) : un "produit" par participant, portions = 1.
+      const workshopInputs: RecipeOverheadInput[] = workshops.map((w) => ({
+        id: `workshop:${w.id}`,
+        prixVente: w.prix_participant,
+        portions: 1,
+        forecastQuantity: (w.monthlySessions[monthIndex] ?? 0) * (w.monthlyParticipants[monthIndex] ?? 0),
+      }));
+      const overheadByRecipe = allocateOverhead([...overheadInputs, ...workshopInputs], summary.total);
 
       const rows = recipes.map((r) => {
         const forecast = forecasts[r.id]?.[monthIndex] ?? 0;
@@ -231,7 +254,30 @@ export function PlanningView({
         };
       });
 
-      const totals = rows.reduce(
+      const workshopRows = workshops.map((w) => {
+        const sessions = w.monthlySessions[monthIndex] ?? 0;
+        const participants = w.monthlyParticipants[monthIndex] ?? 0;
+        const totalParticipants = sessions * participants;
+        const revenue = totalParticipants * w.prix_participant;
+        const matter = totalParticipants * w.kitCost;
+        // "Frais" = frais de séance (animation, divers) + quote-part de frais généraux.
+        const overhead =
+          sessions * sessionFixedCost(w) + totalParticipants * (overheadByRecipe.get(`workshop:${w.id}`) ?? 0);
+        const margin = revenue - matter - overhead;
+        return {
+          id: w.id,
+          nom: w.nom,
+          sessions,
+          participants,
+          revenue,
+          matter,
+          overhead,
+          margin,
+          rate: revenue > 0 ? (margin / revenue) * 100 : 0,
+        };
+      });
+
+      const totals = [...rows, ...workshopRows].reduce(
         (acc, row) => ({
           revenue: acc.revenue + row.revenue,
           matter: acc.matter + row.matter,
@@ -241,9 +287,16 @@ export function PlanningView({
         { revenue: 0, matter: 0, overhead: 0, margin: 0 }
       );
 
-      return { summary, rows, totals, forecastFilled: totalPartsForecast > 0 };
+      const workshopParticipants = workshopRows.reduce((sum, w) => sum + w.sessions * w.participants, 0);
+      return {
+        summary,
+        rows,
+        workshopRows,
+        totals,
+        forecastFilled: totalPartsForecast > 0 || workshopParticipants > 0,
+      };
     });
-  }, [recipes, forecasts, realised, employees, fixedCosts, utilitiesByMonth, margeCible]);
+  }, [recipes, workshops, forecasts, realised, employees, fixedCosts, utilitiesByMonth, margeCible]);
 
   const current = monthlyResults[selectedMonth];
   const totalRate = current.totals.revenue > 0 ? (current.totals.margin / current.totals.revenue) * 100 : 0;
@@ -257,19 +310,25 @@ export function PlanningView({
 
   return (
     <div className="space-y-10">
-      <section>
+      {/* Téléphone : la grille 12 mois est trop large, la saisie se fait mois par mois plus bas. */}
+      <p className="rounded-xl border border-brand-line bg-brand-panel-soft/60 p-4 text-sm text-brand-muted md:hidden">
+        Choisissez un mois ci-dessous puis saisissez les quantités prévues et réalisées de chaque{" "}
+        {vocab.recipeLower}. « Toute l&apos;année » applique la même quantité aux 12 mois.
+      </p>
+
+      <section className="hidden md:block">
         <h2 className="text-lg font-semibold tracking-tight text-brand-ink">Grille de saisie</h2>
         <p className="mt-1 text-sm text-brand-muted">
-          Renseignez le prévisionnel de chaque recette pour chaque mois — utile pour anticiper les
-          écarts saisonniers (ex : plus de mojitos l&apos;été, moins en hiver). Pour une quantité
-          stable toute l&apos;année, utilisez le champ &quot;Tout l&apos;an&quot; sous le nom de la
-          recette.
+          Renseignez le prévisionnel de chaque {vocab.recipeLower} pour chaque mois — utile pour
+          anticiper les écarts saisonniers (ex : {vocab.seasonalExample}). Pour une quantité stable
+          toute l&apos;année, utilisez le champ &quot;Tout l&apos;an&quot; sous le nom de la{" "}
+          {vocab.recipeLower}.
         </p>
         <div className={`mt-4 ${tableWrapClass}`}>
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead className={tableHeadClass}>
               <tr>
-                <th className="sticky left-0 bg-brand-panel-soft/70 px-4 py-3">Recette</th>
+                <th className="sticky left-0 bg-brand-panel-soft/70 px-4 py-3">{vocab.recipe}</th>
                 {MONTH_SHORT_LABELS.map((label) => (
                   <th key={label} className="px-2 py-3 text-center">
                     {label}
@@ -313,7 +372,7 @@ export function PlanningView({
               {!recipes.length ? (
                 <tr>
                   <td colSpan={14} className="px-4 py-8 text-center text-brand-muted">
-                    Aucune recette pour l&apos;instant.
+                    Aucune {vocab.recipeLower} pour l&apos;instant.
                   </td>
                 </tr>
               ) : null}
@@ -335,19 +394,31 @@ export function PlanningView({
             ) : null}
           </table>
         </div>
+        {workshops.length ? (
+          <p className="mt-2 text-sm text-brand-muted">
+            Le prévisionnel des ateliers (séances et participants) se saisit sur la fiche de chaque{" "}
+            <Link href={`/etablissements/${establishmentId}/ateliers`} className="underline">
+              atelier
+            </Link>
+            . Ils sont inclus dans le détail du mois ci-dessous.
+          </p>
+        ) : null}
       </section>
 
       <section>
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold tracking-tight text-brand-ink">Détail du mois</h2>
         </div>
-        <div className="mt-3 inline-flex flex-wrap gap-1 rounded-xl border border-brand-line bg-brand-panel-soft/60 p-1">
+        <div
+          ref={monthBarRef}
+          className="relative mt-3 flex max-w-full gap-1 overflow-x-auto rounded-xl border border-brand-line bg-brand-panel-soft/60 p-1 md:inline-flex md:flex-wrap"
+        >
           {MONTH_SHORT_LABELS.map((label, i) => (
             <button
               key={label}
               type="button"
               onClick={() => setSelectedMonth(i)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
+              className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition-all md:py-1.5 ${
                 selectedMonth === i
                   ? "bg-white text-brand-accent-dark shadow-sm"
                   : "text-brand-muted hover:text-brand-ink"
@@ -373,7 +444,7 @@ export function PlanningView({
           />
           <StatTile label="Frais généraux du mois" value={money(current.summary.total)} icon="🧾" />
           <StatTile
-            label="Recettes incomplètes"
+            label={`${vocab.recipes} incomplètes`}
             value={missingCount ? number(missingCount) : "OK"}
             tone={missingCount ? "warning" : "success"}
             icon="⚠️"
@@ -400,16 +471,101 @@ export function PlanningView({
           />
         </div>
 
-        <div className={`mt-4 ${tableWrapClass}`}>
+        <ul className="mt-4 space-y-3 md:hidden">
+          {current.rows.map((row) => {
+            const forecastValue = forecasts[row.id]?.[selectedMonth] ?? 0;
+            const actualValue = realised[row.id]?.[selectedMonth] ?? 0;
+            return (
+              <li key={row.id} className={`p-4 ${cardClass}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <Link
+                    href={`/etablissements/${establishmentId}/recipes/${row.id}`}
+                    className="min-w-0 font-medium text-brand-ink hover:text-brand-accent hover:underline"
+                  >
+                    {row.nom}
+                  </Link>
+                  <span
+                    className={`shrink-0 text-sm font-medium ${
+                      row.revenue > 0 && row.rate < 60 ? "text-brand-danger" : "text-brand-success"
+                    }`}
+                  >
+                    {row.revenue > 0 ? `${row.rate.toFixed(1)}%` : "-"}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <label className="text-xs font-medium text-brand-muted">
+                    Prévu
+                    <MonthValueCell
+                      key={`m-forecast-${row.id}-${selectedMonth}-${forecastValue}`}
+                      value={forecastValue}
+                      onChange={(value) => setCell(row.id, selectedMonth, value)}
+                      commit={(value) => updateMonthlyForecast(row.id, establishmentId, selectedMonth + 1, value)}
+                      width="w-full"
+                    />
+                  </label>
+                  <label className="text-xs font-medium text-brand-muted">
+                    Réalisé ({actualsYear})
+                    <MonthValueCell
+                      key={`m-actual-${row.id}-${selectedMonth}-${actualValue}`}
+                      value={actualValue}
+                      onChange={(value) => setRealisedCell(row.id, selectedMonth, value)}
+                      commit={(value) =>
+                        updateMonthlyActual(row.id, establishmentId, actualsYear, selectedMonth + 1, value)
+                      }
+                      width="w-full"
+                    />
+                  </label>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs text-brand-muted">
+                    CA {row.priced ? money(row.revenue) : "non rempli"} · Marge {money(row.margin)}
+                  </p>
+                  <span className="inline-flex items-center gap-1.5 text-xs text-brand-muted">
+                    Toute l&apos;année :
+                    <RowFillControl onApply={(value) => applyToAllMonths(row.id, value)} />
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+          {current.workshopRows.map((row) => (
+            <li key={`m-workshop-${row.id}`} className={`p-4 ${cardClass}`}>
+              <div className="flex items-start justify-between gap-3">
+                <Link
+                  href={`/etablissements/${establishmentId}/ateliers/${row.id}`}
+                  className="min-w-0 font-medium text-brand-ink hover:text-brand-accent hover:underline"
+                >
+                  {row.nom}
+                </Link>
+                <span className="shrink-0 rounded bg-brand-panel-soft px-1.5 py-0.5 text-[10px] font-medium uppercase text-brand-muted">
+                  Atelier
+                </span>
+              </div>
+              <p className="mt-2 text-sm text-brand-muted">
+                {number(row.sessions)} séance(s) × {number(row.participants)} participant(s)
+              </p>
+              <p className="text-xs text-brand-muted">
+                CA {money(row.revenue)} · Marge {money(row.margin)}
+              </p>
+            </li>
+          ))}
+          {!current.rows.length && !current.workshopRows.length ? (
+            <li className="rounded-xl border border-dashed border-brand-line p-8 text-center text-sm text-brand-muted">
+              Aucune {vocab.recipeLower} pour l&apos;instant.
+            </li>
+          ) : null}
+        </ul>
+
+        <div className={`mt-4 hidden md:block ${tableWrapClass}`}>
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead className={tableHeadClass}>
               <tr>
-                <th className="px-4 py-3">Recette</th>
+                <th className="px-4 py-3">{vocab.recipe}</th>
                 <th className="px-4 py-3">Prévisionnel</th>
                 <th className="px-4 py-3">Réalisé ({actualsYear})</th>
                 <th className="px-4 py-3">Écart</th>
                 <th className="px-4 py-3">CA</th>
-                <th className="px-4 py-3">Coût matière</th>
+                <th className="px-4 py-3">{vocab.matterCost}</th>
                 <th className="px-4 py-3">Frais</th>
                 <th className="px-4 py-3">Marge</th>
                 <th className="px-4 py-3">Taux</th>
@@ -477,20 +633,52 @@ export function PlanningView({
                     </tr>
                   );
                 })
-              ) : (
-                <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-brand-muted">
-                    Aucune recette pour l&apos;instant.
+              ) : null}
+              {current.workshopRows.map((row) => (
+                <tr key={`workshop-${row.id}`} className={tableRowClass}>
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/etablissements/${establishmentId}/ateliers/${row.id}`}
+                      className="font-medium text-brand-ink hover:text-brand-accent hover:underline"
+                    >
+                      {row.nom}
+                    </Link>
+                    <span className="ml-2 rounded bg-brand-panel-soft px-1.5 py-0.5 text-[10px] font-medium uppercase text-brand-muted">
+                      Atelier
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-brand-muted">
+                    {number(row.sessions)} séance(s) × {number(row.participants)}
+                  </td>
+                  <td className="px-4 py-3 text-brand-muted">-</td>
+                  <td className="px-4 py-3 text-brand-muted">-</td>
+                  <td className="px-4 py-3 text-brand-muted">{money(row.revenue)}</td>
+                  <td className="px-4 py-3 text-brand-muted">{money(row.matter)}</td>
+                  <td className="px-4 py-3 text-brand-muted">{money(row.overhead)}</td>
+                  <td className="px-4 py-3 text-brand-muted">{money(row.margin)}</td>
+                  <td
+                    className={`px-4 py-3 font-medium ${
+                      row.revenue > 0 && row.rate < 60 ? "text-brand-danger" : "text-brand-success"
+                    }`}
+                  >
+                    {row.revenue > 0 ? `${row.rate.toFixed(1)}%` : "-"}
                   </td>
                 </tr>
-              )}
+              ))}
+              {!current.rows.length && !current.workshopRows.length ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-8 text-center text-brand-muted">
+                    Aucune {vocab.recipeLower} pour l&apos;instant.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>
       </section>
 
       <p className="text-sm text-brand-muted">
-        Les besoins en approvisionnement (quantité d&apos;ingrédients nécessaire pour le mois) sont
+        Les besoins en approvisionnement (quantité de {vocab.ingredientsLower} nécessaire pour le mois) sont
         désormais dans le{" "}
         <Link href={`/etablissements/${establishmentId}/rapport`} className="underline">
           Rapport

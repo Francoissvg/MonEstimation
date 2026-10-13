@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { deleteRecipe } from "./actions";
 import { dangerLinkClass } from "@/lib/ui";
+import { useVocabulary } from "@/components/vocabulary-provider";
 
 export function DeleteRecipeButton({
   id,
@@ -13,6 +14,7 @@ export function DeleteRecipeButton({
   establishmentId: string;
   nom: string;
 }) {
+  const vocab = useVocabulary();
   const [pending, startTransition] = useTransition();
 
   return (
@@ -21,7 +23,7 @@ export function DeleteRecipeButton({
       disabled={pending}
       onClick={(event) => {
         event.preventDefault();
-        if (confirm(`Supprimer la recette "${nom}" ?`)) {
+        if (confirm(`Supprimer la ${vocab.recipeLower} "${nom}" ?`)) {
           startTransition(() => deleteRecipe(id, establishmentId));
         }
       }}

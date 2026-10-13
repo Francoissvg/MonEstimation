@@ -12,6 +12,7 @@ import { RecipeIngredientsManager, type RecipeIngredientRow } from "./recipe-ing
 import { IngredientPicker } from "./ingredient-picker";
 import { SaveHistoryButton } from "./save-history-button";
 import { RecipeForecastEditor } from "./recipe-forecast-editor";
+import { getEstablishmentVocabulary } from "@/lib/establishment.server";
 
 export default async function RecipeDetailPage({
   params,
@@ -19,6 +20,7 @@ export default async function RecipeDetailPage({
   params: Promise<{ id: string; recipeId: string }>;
 }) {
   const { id, recipeId } = await params;
+  const vocab = await getEstablishmentVocabulary(id);
   const supabase = await createClient();
   const {
     data: { user },
@@ -87,9 +89,9 @@ export default async function RecipeDetailPage({
   const hasOverheadConfigured = costContext.summary.monthlyUnits > 0;
 
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-10">
       <Link href={`/etablissements/${id}/recipes`} className={ghostLinkClass}>
-        ← Recettes
+        ← {vocab.recipes}
       </Link>
       <h1 className="mt-2 text-2xl font-semibold tracking-tight text-brand-ink">{recipe.nom}</h1>
 
@@ -105,31 +107,35 @@ export default async function RecipeDetailPage({
         />
       </div>
 
-      <h2 className="mt-8 text-lg font-semibold text-brand-ink">Ingrédients de la recette</h2>
+      <h2 className="mt-8 text-lg font-semibold text-brand-ink">{vocab.ingredients} de la {vocab.recipeLower}</h2>
       <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <IngredientPicker
           establishmentId={id}
-          recipeId={recipe.id}
+          ownerId={recipe.id}
           availableIngredients={allIngredients ?? []}
         />
-        <RecipeIngredientsManager establishmentId={id} recipeId={recipe.id} items={items} />
+        <RecipeIngredientsManager establishmentId={id} ownerId={recipe.id} items={items} />
       </div>
 
-      <h2 className="mt-8 text-lg font-semibold text-brand-ink">Résumé de la fournée</h2>
-      <p className="mt-1 text-sm text-brand-muted">
-        Une fournée de cette recette donne {recipe.portions} part(s), vendue(s){" "}
-        {money(recipe.prix_vente)} chacune.
-      </p>
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatTile label="Parts par fournée" value={String(recipe.portions)} icon="🍰" />
-        <StatTile label="Coût total (fournée)" value={money(breakdown.total)} icon="🧾" />
+      <h2 className="mt-8 text-lg font-semibold text-brand-ink">Résumé de la {vocab.batch}</h2>
+      {vocab.showPortions ? (
+        <p className="mt-1 text-sm text-brand-muted">
+          Une fournée de cette recette donne {recipe.portions} part(s), vendue(s){" "}
+          {money(recipe.prix_vente)} chacune.
+        </p>
+      ) : null}
+      <div className={`mt-3 grid grid-cols-2 gap-3 ${vocab.showPortions ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>
+        {vocab.showPortions ? (
+          <StatTile label="Parts par fournée" value={String(recipe.portions)} icon="🍰" />
+        ) : null}
+        <StatTile label={`Coût total (${vocab.batch})`} value={money(breakdown.total)} icon="🧾" />
         <StatTile
-          label="CA total (fournée)"
+          label={`CA total (${vocab.batch})`}
           value={money(recipe.prix_vente * recipe.portions)}
           icon="💰"
         />
         <StatTile
-          label="Marge totale (fournée)"
+          label={`Marge totale (${vocab.batch})`}
           value={money(recipe.prix_vente * recipe.portions - breakdown.total)}
           tone="accent"
           icon="➕"
@@ -138,7 +144,7 @@ export default async function RecipeDetailPage({
 
       <h2 className="mt-8 text-lg font-semibold text-brand-ink">Prévisionnel mensuel</h2>
       <p className="mt-1 text-sm text-brand-muted">
-        Nombre de fournées prévues chaque mois pour cette recette — utilisé pour répartir les frais
+        Nombre de {vocab.batches} prévues chaque mois pour cette {vocab.recipeLower} — utilisé pour répartir les frais
         généraux et alimenter la page{" "}
         <Link href={`/etablissements/${id}/projection`} className="underline">
           Prévisionnel
@@ -149,7 +155,7 @@ export default async function RecipeDetailPage({
         <RecipeForecastEditor establishmentId={id} recipeId={recipe.id} initialForecasts={initialForecasts} />
       </div>
 
-      <h2 className="mt-8 text-lg font-semibold text-brand-ink">Coût de revient par part</h2>
+      <h2 className="mt-8 text-lg font-semibold text-brand-ink">Coût de revient par {vocab.part}</h2>
       <p className="mt-1 text-sm text-brand-muted">
         Calculé pour {MONTH_LABELS[currentMonth() - 1]} (
         <Link href={`/etablissements/${id}/projection`} className="underline">
@@ -172,11 +178,11 @@ export default async function RecipeDetailPage({
         </p>
       ) : null}
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatTile label="Coût matière" value={money(breakdown.matter)} icon="🧺" />
+        <StatTile label={vocab.matterCost} value={money(breakdown.matter)} icon="🧺" />
         <StatTile label="Quote-part frais" value={money(breakdown.overhead)} icon="🧾" />
-        <StatTile label="Coût de revient / part" value={money(breakdown.unitCost)} tone="accent" icon="💶" />
+        <StatTile label={`Coût de revient / ${vocab.part}`} value={money(breakdown.unitCost)} tone="accent" icon="💶" />
         <StatTile label="Prix conseillé" value={money(breakdown.suggestedPrice)} tone="accent" icon="🏷️" />
-        <StatTile label="Marge / part" value={money(breakdown.margin)} icon="➕" />
+        <StatTile label={`Marge / ${vocab.part}`} value={money(breakdown.margin)} icon="➕" />
         <StatTile
           label="Taux de marge"
           value={`${breakdown.marginRate.toFixed(1)}%`}
@@ -184,7 +190,7 @@ export default async function RecipeDetailPage({
           icon="📈"
         />
         <StatTile
-          label="Marge brute / part (sans les frais)"
+          label={`Marge brute / ${vocab.part} (sans les frais)`}
           value={money(breakdown.grossMargin)}
           icon="➕"
         />

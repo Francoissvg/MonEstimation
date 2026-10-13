@@ -4,6 +4,7 @@ import { useState } from "react";
 import { MultiLineChart, type MultiLineSeries } from "@/components/charts/multi-line-chart";
 import { CATEGORICAL_COLORS } from "@/lib/chart-colors";
 import { money } from "@/lib/format";
+import { useVocabulary } from "@/components/vocabulary-provider";
 
 export type IngredientPriceHistory = {
   ingredientId: string;
@@ -13,6 +14,7 @@ export type IngredientPriceHistory = {
 };
 
 export function PriceEvolutionChart({ histories }: { histories: IngredientPriceHistory[] }) {
+  const vocab = useVocabulary();
   const eligible = histories.filter((h) => h.points.length >= 2);
   const [selectedIds, setSelectedIds] = useState<string[]>(
     eligible.slice(0, 1).map((h) => h.ingredientId)
@@ -21,7 +23,8 @@ export function PriceEvolutionChart({ histories }: { histories: IngredientPriceH
   if (!eligible.length) {
     return (
       <p className="text-sm text-brand-muted">
-        Enregistrez au moins deux achats pour un même ingrédient (page Ingrédients → Historique)
+        Enregistrez au moins deux achats pour {vocab.sameIngredient} (page {vocab.ingredients} →
+        Historique)
         pour voir son évolution de prix ici.
       </p>
     );

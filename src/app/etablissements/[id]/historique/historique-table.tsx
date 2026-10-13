@@ -6,6 +6,7 @@ import { tableWrapClass, tableHeadClass, tableRowClass } from "@/lib/ui";
 import { compareValues, toggleSort, type SortState } from "@/lib/sort";
 import { SortHeader } from "@/components/sort-header";
 import { SearchInput } from "@/components/search-input";
+import { useVocabulary } from "@/components/vocabulary-provider";
 
 export type HistoryRow = {
   id: string;
@@ -35,6 +36,7 @@ function formatDate(value: string): string {
 }
 
 export function HistoriqueTable({ history }: { history: HistoryRow[] }) {
+  const vocab = useVocabulary();
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortState<SortKey>>({ key: "calculated_at", direction: "desc" });
 
@@ -61,7 +63,7 @@ export function HistoriqueTable({ history }: { history: HistoryRow[] }) {
   return (
     <div className="space-y-4">
       <div className="max-w-xs">
-        <SearchInput value={search} onChange={setSearch} placeholder="Rechercher une recette..." />
+        <SearchInput value={search} onChange={setSearch} placeholder={`Rechercher une ${vocab.recipeLower}...`} />
       </div>
 
       <div className={tableWrapClass}>
@@ -69,10 +71,10 @@ export function HistoriqueTable({ history }: { history: HistoryRow[] }) {
           <thead className={tableHeadClass}>
             <tr>
               <th className="px-4 py-3">{header("calculated_at", "Date")}</th>
-              <th className="px-4 py-3">{header("recipe_nom", "Recette")}</th>
-              <th className="px-4 py-3">{header("cout_matiere", "Coût matière")}</th>
+              <th className="px-4 py-3">{header("recipe_nom", vocab.recipe)}</th>
+              <th className="px-4 py-3">{header("cout_matiere", vocab.matterCost)}</th>
               <th className="px-4 py-3">{header("quote_part_frais", "Frais")}</th>
-              <th className="px-4 py-3">{header("cout_revient_unitaire", "Coût / part")}</th>
+              <th className="px-4 py-3">{header("cout_revient_unitaire", `Coût / ${vocab.part}`)}</th>
               <th className="px-4 py-3">{header("prix_vente", "Prix vente")}</th>
               <th className="px-4 py-3">{header("marge", "Marge")}</th>
               <th className="px-4 py-3">{header("prix_conseille", "Prix conseillé")}</th>

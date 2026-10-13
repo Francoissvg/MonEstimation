@@ -2,31 +2,39 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { saveRecipeIngredient, type FormState } from "./actions";
+import { saveWorkshopItem } from "../../ateliers/actions";
 import { compatibleUnits, pricePerUsageUnit, baseUnitFor } from "@/lib/units";
 import { money } from "@/lib/format";
 import { cardClass, inputClass, primaryButtonClass } from "@/lib/ui";
 import type { AvailableIngredient } from "./recipe-ingredients-manager";
+import { useVocabulary } from "@/components/vocabulary-provider";
 
 const UNIT_LABELS: Record<string, string> = {
   g: "g",
   kg: "kg",
   ml: "ml",
   l: "l",
-  piece: "pièce(s)",
 };
 
 const initialState: FormState = { error: null };
 
+// Sélection d'un élément à ajouter à une recette ou au kit d'un atelier (`target`).
 export function IngredientPicker({
   establishmentId,
-  recipeId,
+  ownerId,
   availableIngredients,
+  target = "recipe",
 }: {
   establishmentId: string;
-  recipeId: string;
+  ownerId: string; // id de la recette ou de l'atelier
   availableIngredients: AvailableIngredient[];
+  target?: "recipe" | "workshop";
 }) {
-  const [state, formAction, pending] = useActionState(saveRecipeIngredient, initialState);
+  const vocab = useVocabulary();
+  const [state, formAction, pending] = useActionState(
+    target === "workshop" ? saveWorkshopItem : saveRecipeIngredient,
+    initialState
+  );
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -57,7 +65,8 @@ export function IngredientPicker({
   if (!availableIngredients.length) {
     return (
       <p className="rounded-xl border border-dashed border-brand-line bg-white p-6 text-center text-sm text-brand-muted">
-        Ajoutez d&apos;abord des ingrédients à cet établissement avant de composer une recette.
+        Ajoutez d&apos;abord des {vocab.ingredientsLower} à cet établissement avant de{" "}
+        {target === "workshop" ? "constituer le kit" : `composer une ${vocab.recipeLower}`}.
       </p>
     );
   }
@@ -67,7 +76,7 @@ export function IngredientPicker({
       <div className="border-b border-brand-line p-3">
         <input
           type="text"
-          placeholder="Rechercher un ingrédient..."
+          placeholder={`Rechercher ${vocab.anIngredient}...`}
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           className={inputClass}
@@ -81,7 +90,7 @@ export function IngredientPicker({
           className="flex flex-wrap items-end gap-2 border-b border-brand-line bg-brand-panel-soft/60 p-3"
         >
           <input type="hidden" name="establishment_id" value={establishmentId} />
-          <input type="hidden" name="recipe_id" value={recipeId} />
+          <input type="hidden" name={target === "workshop" ? "workshop_id" : "recipe_id"} value={ownerId} />
           <input type="hidden" name="ingredient_id" value={selected.id} />
           <div className="flex-1">
             <p className="text-sm font-medium text-brand-ink">{selected.nom}</p>
@@ -105,7 +114,7 @@ export function IngredientPicker({
           <select name="unite" className={`${inputClass} mt-0 w-28`}>
             {unitOptions.map((unit) => (
               <option key={unit} value={unit}>
-                {UNIT_LABELS[unit]}
+                {unit === "piece" ? vocab.pieceLabel : UNIT_LABELS[unit]}
               </option>
             ))}
           </select>

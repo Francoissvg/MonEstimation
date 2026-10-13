@@ -5,6 +5,7 @@ import { updateMonthlyForecast } from "../actions";
 import { inputClass } from "@/lib/ui";
 import { number } from "@/lib/format";
 import { MONTH_SHORT_LABELS } from "@/lib/months";
+import { useVocabulary } from "@/components/vocabulary-provider";
 
 function ForecastMonthInput({
   establishmentId,
@@ -61,6 +62,7 @@ export function RecipeForecastEditor({
   recipeId: string;
   initialForecasts: number[]; // 12 valeurs, index 0 = janvier
 }) {
+  const vocab = useVocabulary();
   const [forecasts, setForecasts] = useState(initialForecasts);
   const total = forecasts.reduce((sum, v) => sum + v, 0);
 
@@ -89,7 +91,7 @@ export function RecipeForecastEditor({
         ))}
       </div>
       <p className="mt-3 text-sm text-brand-muted">
-        Total annuel prévu : <strong>{number(total)}</strong> fournée(s).
+        Total annuel prévu : <strong>{number(total)}</strong> {vocab.batch}(s).
       </p>
     </div>
   );

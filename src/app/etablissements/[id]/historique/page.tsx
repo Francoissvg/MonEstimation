@@ -5,6 +5,7 @@ import { SupplierPriceReport, type SupplierPriceRow } from "./supplier-price-rep
 import { PurchaseVsSaleChart, type RecipeHistorySeries } from "./purchase-vs-sale-chart";
 import { pricePerUsageUnit, baseUnitFor } from "@/lib/units";
 import { cardClass } from "@/lib/ui";
+import { getEstablishmentVocabulary } from "@/lib/establishment.server";
 
 export default async function HistoriquePage({
   params,
@@ -12,6 +13,7 @@ export default async function HistoriquePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const vocab = await getEstablishmentVocabulary(id);
   const supabase = await createClient();
   const {
     data: { user },
@@ -79,7 +81,7 @@ export default async function HistoriquePage({
       return {
         ingredientId,
         supplierId,
-        ingredientNom: ingredientNomById.get(ingredientId) ?? "Ingrédient",
+        ingredientNom: ingredientNomById.get(ingredientId) ?? vocab.ingredient,
         supplierNom: supplierNomById.get(supplierId) ?? "Fournisseur",
         firstPrice: first.unitPrice,
         firstDate: first.purchased_at,
@@ -109,7 +111,7 @@ export default async function HistoriquePage({
   );
 
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 px-6 py-10">
+    <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6 sm:py-10">
       <h1 className="text-2xl font-semibold tracking-tight text-brand-ink">Historique</h1>
       <p className="mt-1 text-sm text-brand-muted">
         Suivez la hausse des prix par fournisseur et comparez ce que vous avez acheté à ce que vous
@@ -120,7 +122,7 @@ export default async function HistoriquePage({
         <section className={`p-5 ${cardClass}`}>
           <h2 className="text-sm font-semibold text-brand-ink">Rapport fournisseurs</h2>
           <p className="mt-0.5 mb-4 text-xs text-brand-muted">
-            Comparaison du prix payé pour un même ingrédient auprès d&apos;un même fournisseur, entre
+            Comparaison du prix payé pour {vocab.sameIngredient} auprès d&apos;un même fournisseur, entre
             le premier et le dernier achat.
           </p>
           <SupplierPriceReport rows={supplierPriceRows} />
@@ -129,8 +131,8 @@ export default async function HistoriquePage({
         <section className={`p-5 ${cardClass}`}>
           <h2 className="text-sm font-semibold text-brand-ink">Achat vs vente dans le temps</h2>
           <p className="mt-0.5 mb-4 text-xs text-brand-muted">
-            Coût de revient par part comparé au prix de vente, à chaque calcul enregistré depuis une
-            fiche recette.
+            Coût de revient par {vocab.part} comparé au prix de vente, à chaque calcul enregistré
+            depuis une fiche {vocab.recipeLower}.
           </p>
           <PurchaseVsSaleChart series={purchaseVsSaleSeries} />
         </section>

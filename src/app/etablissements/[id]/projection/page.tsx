@@ -20,7 +20,7 @@ export default async function ProjectionPage({
   const data = await getPlanningData(supabase, id);
 
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-10">
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-10">
       <h1 className="text-2xl font-semibold tracking-tight text-brand-ink">Prévisionnel</h1>
       <p className="mt-1 text-sm text-brand-muted">
         Prévisionnel de vente mois par mois — les frais généraux (salariés saisonniers, charges
@@ -31,6 +31,7 @@ export default async function ProjectionPage({
         <PlanningView
           establishmentId={id}
           recipes={data.recipes}
+          workshops={data.workshops}
           employees={data.employees}
           fixedCosts={data.fixedCosts}
           utilitiesByMonth={data.utilitiesByMonth}

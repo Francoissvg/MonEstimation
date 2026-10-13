@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import { saveRecipe, type FormState } from "./actions";
 import { cardClass, inputClass, labelClass, primaryButtonClass } from "@/lib/ui";
+import { useVocabulary } from "@/components/vocabulary-provider";
 
 export type RecipeRow = {
   id: string;
@@ -22,6 +23,7 @@ export function RecipeForm({
   editing?: RecipeRow | null;
   onSaved?: () => void;
 }) {
+  const vocab = useVocabulary();
   const [state, formAction, pending] = useActionState(saveRecipe, initialState);
   const formRef = useRef<HTMLFormElement>(null);
   const wasPending = useRef(false);
@@ -45,35 +47,39 @@ export function RecipeForm({
       {editing ? <input type="hidden" name="id" value={editing.id} /> : null}
 
       <div className="col-span-2 sm:col-span-4">
-        <label className={labelClass}>Nom de la recette</label>
+        <label className={labelClass}>Nom de la {vocab.recipeLower}</label>
         <input
           name="nom"
           type="text"
           required
           defaultValue={editing?.nom ?? ""}
-          placeholder="Ex : Baguette tradition"
+          placeholder={vocab.recipePlaceholder}
           className={inputClass}
         />
       </div>
 
-      <div>
-        <label className={labelClass}>Nombre de parts</label>
-        <p className="mt-1 text-xs text-brand-muted">
-          Combien de parts vendables produit une fournée (1 si vendu à la pièce).
-        </p>
-        <input
-          name="portions"
-          type="text"
-          inputMode="decimal"
-          required
-          defaultValue={editing?.portions ?? 1}
-          placeholder="1"
-          className={inputClass}
-        />
-      </div>
+      {vocab.showPortions ? (
+        <div>
+          <label className={labelClass}>Nombre de parts</label>
+          <p className="mt-1 text-xs text-brand-muted">
+            Combien de parts vendables produit une fournée (1 si vendu à la pièce).
+          </p>
+          <input
+            name="portions"
+            type="text"
+            inputMode="decimal"
+            required
+            defaultValue={editing?.portions ?? 1}
+            placeholder="1"
+            className={inputClass}
+          />
+        </div>
+      ) : (
+        <input type="hidden" name="portions" value={editing?.portions ?? 1} />
+      )}
 
       <div>
-        <label className={labelClass}>Prix de vente € / part</label>
+        <label className={labelClass}>Prix de vente € / {vocab.part}</label>
         <input
           name="prix_vente"
           type="text"
@@ -87,7 +93,7 @@ export function RecipeForm({
 
       <div className="col-span-2 flex items-end sm:col-span-4">
         <button type="submit" disabled={pending} className={primaryButtonClass}>
-          {pending ? "Enregistrement..." : editing ? "Mettre à jour" : "Créer la recette"}
+          {pending ? "Enregistrement..." : editing ? "Mettre à jour" : `Créer la ${vocab.recipeLower}`}
         </button>
       </div>
 

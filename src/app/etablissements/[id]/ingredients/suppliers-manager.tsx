@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { deleteSupplier, saveSupplier, type FormState } from "./actions";
 import { cardClass, dangerLinkClass, inputClass, labelClass, primaryButtonClass } from "@/lib/ui";
+import { useVocabulary } from "@/components/vocabulary-provider";
 
 export type SupplierRow = {
   id: string;
@@ -21,6 +22,7 @@ export function SuppliersManager({
   suppliers: SupplierRow[];
   purchaseCountBySupplier: Record<string, number>;
 }) {
+  const vocab = useVocabulary();
   const [state, formAction, pending] = useActionState(saveSupplier, initialState);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [busy, startTransition] = useTransition();
@@ -45,7 +47,7 @@ export function SuppliersManager({
         </span>
       </summary>
       <p className="mt-2 text-xs text-brand-muted">
-        Associez un fournisseur à chaque achat (dans l&apos;historique d&apos;un ingrédient) pour
+        Associez un fournisseur à chaque achat (bouton « Historique » de chaque ligne du tableau {vocab.ingredients}) pour
         comparer leurs prix.
       </p>
 

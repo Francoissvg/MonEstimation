@@ -7,6 +7,7 @@ import { money, moneyPrecise, number } from "@/lib/format";
 import { cardClass, dangerLinkClass, inputClass, labelClass, primaryButtonClass } from "@/lib/ui";
 import { PURCHASE_UNITS } from "@/lib/constants";
 import type { SupplierRow } from "./suppliers-manager";
+import { useVocabulary } from "@/components/vocabulary-provider";
 
 export type PurchaseRow = {
   id: string;
@@ -23,7 +24,6 @@ const UNIT_LABELS: Record<string, string> = {
   kg: "kg",
   ml: "ml",
   l: "l",
-  piece: "pièce(s)",
 };
 
 const initialState: FormState = { error: null };
@@ -33,12 +33,15 @@ export function PurchaseHistory({
   ingredientId,
   purchases,
   suppliers,
+  defaultUnit = "kg",
 }: {
   establishmentId: string;
   ingredientId: string;
   purchases: PurchaseRow[];
   suppliers: SupplierRow[];
+  defaultUnit?: string; // unité d'achat habituelle de l'élément, présélectionnée
 }) {
+  const vocab = useVocabulary();
   const [state, formAction, pending] = useActionState(addIngredientPurchase, initialState);
   const [deleting, startDeleteTransition] = useTransition();
   const formRef = useRef<HTMLFormElement>(null);
@@ -97,11 +100,11 @@ export function PurchaseHistory({
   const supplierName = (id: string | null) => (id ? suppliers.find((s) => s.id === id)?.nom : null);
 
   return (
-    <div className="space-y-4 border-t border-brand-line/70 bg-brand-panel-soft/40 p-4">
+    <div className="space-y-4 border-t border-brand-line/70 bg-brand-panel-soft/40 p-3 sm:p-4">
       <form
         ref={formRef}
         action={formAction}
-        className={`flex flex-col gap-3 p-4 sm:flex-row sm:items-end ${cardClass}`}
+        className={`grid grid-cols-2 gap-3 p-4 lg:flex lg:items-end ${cardClass}`}
       >
         <input type="hidden" name="establishment_id" value={establishmentId} />
         <input type="hidden" name="ingredient_id" value={ingredientId} />
@@ -122,10 +125,10 @@ export function PurchaseHistory({
         </div>
         <div>
           <label className={labelClass}>Unité</label>
-          <select name="unit" defaultValue="kg" className={inputClass}>
+          <select name="unit" defaultValue={defaultUnit} className={inputClass}>
             {PURCHASE_UNITS.map((unit) => (
               <option key={unit} value={unit}>
-                {UNIT_LABELS[unit]}
+                {unit === "piece" ? vocab.pieceLabel : UNIT_LABELS[unit]}
               </option>
             ))}
           </select>
@@ -149,10 +152,10 @@ export function PurchaseHistory({
           <label className={labelClass}>Note</label>
           <input name="note" placeholder="Optionnel..." className={inputClass} />
         </div>
-        <button type="submit" disabled={pending} className={primaryButtonClass}>
+        <button type="submit" disabled={pending} className={`col-span-2 ${primaryButtonClass}`}>
           {pending ? "Ajout..." : "Enregistrer l'achat"}
         </button>
-        {state.error ? <p className="text-sm text-brand-danger sm:basis-full">{state.error}</p> : null}
+        {state.error ? <p className="col-span-2 text-sm text-brand-danger lg:basis-full">{state.error}</p> : null}
       </form>
 
       {rows.length ? (
@@ -166,7 +169,7 @@ export function PurchaseHistory({
                 {new Date(row.purchased_at).toLocaleDateString("fr-FR")}
               </span>
               <span className="text-brand-ink">
-                {number(row.quantity)} {UNIT_LABELS[row.unit]} · {money(row.price)}
+                {number(row.quantity)} {row.unit === "piece" ? vocab.pieceLabel : UNIT_LABELS[row.unit]} · {money(row.price)}
               </span>
               <span className="font-medium text-brand-ink">
                 {moneyPrecise(row.unitPrice)} / {baseUnitFor(row.unit)}
@@ -207,7 +210,7 @@ export function PurchaseHistory({
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-brand-muted">Aucun achat enregistré pour cet ingrédient.</p>
+        <p className="text-sm text-brand-muted">Aucun achat enregistré pour {vocab.thisIngredient}.</p>
       )}
 
       {supplierComparison.length >= 2 ? (

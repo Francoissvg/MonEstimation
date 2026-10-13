@@ -29,7 +29,7 @@ export function RowActionsMenu({ actions }: { actions: RowAction[] }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="rounded-md px-2 py-1 text-brand-muted transition-colors hover:bg-brand-panel-soft hover:text-brand-ink"
+        className="rounded-md px-3 py-2 text-lg leading-none text-brand-muted sm:px-2 sm:py-1 sm:text-base transition-colors hover:bg-brand-panel-soft hover:text-brand-ink"
         aria-label="Actions"
         aria-expanded={open}
       >
@@ -46,7 +46,7 @@ export function RowActionsMenu({ actions }: { actions: RowAction[] }) {
                 setOpen(false);
                 action.onClick();
               }}
-              className={`block w-full px-3 py-2 text-left text-sm transition-colors disabled:opacity-50 ${
+              className={`block w-full px-3 py-3 text-left text-sm sm:py-2 transition-colors disabled:opacity-50 ${
                 action.tone === "danger"
                   ? "text-brand-danger hover:bg-brand-danger-bg"
                   : "text-brand-ink hover:bg-brand-panel-soft"

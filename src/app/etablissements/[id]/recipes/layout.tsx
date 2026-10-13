@@ -20,7 +20,7 @@ export default async function RecipesLayout({
   return (
     <div className="flex flex-1">
       <RecipesSidebar establishmentId={id} recipes={recipes ?? []} />
-      <div className="flex-1">{children}</div>
+      <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import { secondaryButtonClass } from "@/lib/ui";
+import type { Vocabulary } from "@/lib/vocabulary";
+import { useVocabulary } from "@/components/vocabulary-provider";
 
 export type FullExportData = {
   establishmentNom: string;
@@ -35,7 +37,7 @@ function formatNumber(value: number): string {
   return value.toFixed(2).replace(".", ",");
 }
 
-function buildCsv(data: FullExportData): string {
+function buildCsv(data: FullExportData, vocab: Vocabulary): string {
   const lines: string[] = [];
   const row = (...cells: (string | number)[]) => lines.push(cells.map(csvEscape).join(";"));
   const blank = () => lines.push("");
@@ -43,11 +45,11 @@ function buildCsv(data: FullExportData): string {
   row(`Export complet — ${data.establishmentNom} — ${data.month}`);
   blank();
 
-  row("Ingrédients", "Catégorie", "Prix d'achat (€)", "Coût unitaire (€)", "Unité");
+  row(vocab.ingredients, "Catégorie", "Prix d'achat (€)", "Coût unitaire (€)", "Unité");
   for (const i of data.ingredients) row(i.nom, i.categorie, formatNumber(i.prixAchat), formatNumber(i.coutUnitaire), i.unite);
   blank();
 
-  row("Recettes", "Prix vente (€)", "Coût revient (€)", "Marge (€)", "Taux de marge (%)");
+  row(vocab.recipes, "Prix vente (€)", "Coût revient (€)", "Marge (€)", "Taux de marge (%)");
   for (const r of data.recipes) row(r.nom, formatNumber(r.prixVente), formatNumber(r.unitCost), formatNumber(r.margin), formatNumber(r.marginRate));
   blank();
 
@@ -66,7 +68,7 @@ function buildCsv(data: FullExportData): string {
   for (const c of data.fixedCosts) row(c.nom, formatNumber(c.montant), c.frequence, c.actif ? "Oui" : "Non");
   blank();
 
-  row("Prévisionnel — Recette", ...MONTH_HEADERS, "Total");
+  row(`Prévisionnel — ${vocab.recipe}`, ...MONTH_HEADERS, "Total");
   for (const p of data.previsionnel) row(p.nom, ...p.parMois.map(formatNumber), formatNumber(p.total));
   blank();
 
@@ -84,7 +86,7 @@ function buildCsv(data: FullExportData): string {
   for (const a of data.rapportAnnuel) row(a.mois, formatNumber(a.ca), formatNumber(a.cumul));
   blank();
 
-  row("Historique fournisseurs — Ingrédient", "Fournisseur", "Premier prix", "Dernier prix", "Variation (%)");
+  row(`Historique fournisseurs — ${vocab.ingredient}`, "Fournisseur", "Premier prix", "Dernier prix", "Variation (%)");
   for (const f of data.fournisseurs) {
     row(
       f.ingredientNom,
@@ -96,7 +98,7 @@ function buildCsv(data: FullExportData): string {
   }
   blank();
 
-  row("Historique — Date", "Recette", "Coût revient (€)", "Prix vente (€)", "Marge (€)", "Taux (%)");
+  row("Historique — Date", vocab.recipe, "Coût revient (€)", "Prix vente (€)", "Marge (€)", "Taux (%)");
   for (const h of data.historique) {
     row(
       new Date(h.date).toLocaleDateString("fr-FR"),
@@ -112,8 +114,9 @@ function buildCsv(data: FullExportData): string {
 }
 
 export function ExportAllExcelButton({ data }: { data: FullExportData }) {
+  const vocab = useVocabulary();
   const handleClick = () => {
-    const csv = buildCsv(data);
+    const csv = buildCsv(data, vocab);
     const bom = "﻿";
     const blob = new Blob([bom + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
